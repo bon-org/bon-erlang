@@ -10,4 +10,4 @@ decode_test() ->
     {things, ["hello", "I", <<"like">>, 200]},
     "child"
   ]},
-  ?assertEqual(Res, Ans).
+  ?assertEqual(Ans, Res).

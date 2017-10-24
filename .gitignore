@@ -2,3 +2,4 @@
 _rel
 deps
 ebin
+*.beam
