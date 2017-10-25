@@ -9,10 +9,10 @@
 %% API %%
 %%%%%%%%%
 
-decode(Data) ->
-  Res = parse(Data),
-  io:format("Res=~p~n", [Res]),
-  {error, {not_impl, [Res]}}.
+decode(Data) when is_binary(Data) ->
+  {ok, Stack} = parse(Data),
+  io:format("Stack=~p~n", [Stack]),
+  {error, {not_impl, [Stack]}}.
 
 encode(_Data) -> not_impl.
 
@@ -26,6 +26,9 @@ encode(_Data) -> not_impl.
 
 -define(is_digit(B),
   48 =< B andalso B =< 57
+).
+-define(is_alphabet(B),
+  (65 =< B andalso B =< (64 + 26)) or ((65 + 32) =< B andalso B =< (64 + 26 + 32))
 ).
 
 %%%%%%%%%%
@@ -50,7 +53,7 @@ parse(<<"\"", T/binary>>, Stack, Acc, string) ->
   io:format("finishing string, before=~p~n", [Acc]),
   Str = lists:reverse(Acc),
   io:format("after=~p~n", [Str]),
-  parse(T, [Str | Stack], nil, string);
+  parse(T, [Str | Stack], nil, normal);
 parse(<<H, T/binary>>, Stack, Acc, string) ->
   parse(T, Stack, [H | Acc], string);
 
@@ -70,6 +73,13 @@ parse(<<"'", T/binary>>, Stack, {0, Acc}, blob) ->
   parse(T, [Blob | Stack], nil, normal);
 
 %% parse word
+parse(<<H, _/binary>> = Data, Stack, nil, normal) when ?is_alphabet(H) ->
+  parse(Data, Stack, [], word);
+parse(<<H, T/binary>>, Stack, Acc, word) when ?is_alphabet(H) ->
+  parse(T, Stack, [H | Acc], word);
+parse(Data, Stack, Acc, word) ->
+  Word = {word, lists:reverse(Acc)},
+  parse(Data, [Word | Stack], nil, normal);
 
 %% parse number
 parse(<<H, T/binary>>, Stack, nil, normal) when ?is_digit(H) ->
@@ -83,11 +93,26 @@ parse(Data, Stack, Acc, number) ->
 
 %% parse floating number
 
+%% finished parsing state
+parse(<<>>, Stack, nil, normal) ->
+  {ok, Stack};
+
+%% undefined parsing state
 parse(Data, Stack, Acc, Mode) ->
-  io:format("undefined parser state, ~p~n", [#{
+  State = #{
     data => Data,
     stack => Stack,
     acc => Acc,
     mode => Mode
-  }]),
-  not_impl.
+  },
+  io:format("undefined parser state ~~>~p~n", [State]),
+  {error, State}.
+
+
+%%%%%%%%%%%%
+% from_ast %
+%%%%%%%%%%%%
+from_ast([{word, _} | _] = Ast) ->
+  from_ast(lists:reverse(Ast));
+from_ast([A | T]) ->
+  throw(error(implementing)).
