@@ -2,7 +2,9 @@
 
 -export([decode/1, encode/1]).
 
--record(node, {name, children}).
+%%-record(node, {name, children}).
+-record(word, {name}).
+-record(string, {value}).
 
 -compile(export_all).
 
@@ -11,10 +13,10 @@
 %%%%%%%%%
 
 decode(Data) when is_binary(Data) ->
-  {ok, Stack} = tokenize(Data),
-  io:format("Stack=~p~n", [Stack]),
-  Res = parse(Stack),
-  {error, {not_impl, [Res]}}.
+  case tokenize(Data) of
+    {ok, Stack} -> parse(Stack);
+    Res = {error, _Reason} -> Res
+  end.
 
 encode(_Data) -> not_impl.
 
@@ -52,10 +54,8 @@ tokenize(<<" ", T/binary>>, Stack, Acc, normal) ->
 tokenize(<<"\"", T/binary>>, Stack, nil, normal) ->
   tokenize(T, Stack, "", string);
 tokenize(<<"\"", T/binary>>, Stack, Acc, string) ->
-  io:format("finishing string, before=~p~n", [Acc]),
   Str = lists:reverse(Acc),
-  io:format("after=~p~n", [Str]),
-  tokenize(T, [Str | Stack], nil, normal);
+  tokenize(T, [#string{value = Str} | Stack], nil, normal);
 tokenize(<<H, T/binary>>, Stack, Acc, string) ->
   tokenize(T, Stack, [H | Acc], string);
 
@@ -80,7 +80,7 @@ tokenize(<<H, _/binary>> = Data, Stack, nil, normal) when ?is_alphabet(H) ->
 tokenize(<<H, T/binary>>, Stack, Acc, word) when ?is_alphabet(H) ->
   tokenize(T, Stack, [H | Acc], word);
 tokenize(Data, Stack, Acc, word) ->
-  Word = {word, lists:reverse(Acc)},
+  Word = #word{name = lists:reverse(Acc)},
   tokenize(Data, [Word | Stack], nil, normal);
 
 %% parse number
@@ -90,7 +90,6 @@ tokenize(<<H, T/binary>>, Stack, Acc, number) when ?is_digit(H) ->
   tokenize(T, Stack, Acc * 10 + (H - 48), number);
 %%parse(<<H, _/binary>> = Data, Stack, Acc, number) when not (?is_digit(H)) ->
 tokenize(Data, Stack, Acc, number) ->
-  io:format("finishing number, value=~w~n", [Acc]),
   tokenize(Data, [Acc | Stack], nil, normal);
 
 %% parse floating number
@@ -107,26 +106,55 @@ tokenize(Data, Stack, Acc, Mode) ->
     acc => Acc,
     mode => Mode
   },
-  io:format("undefined parser state ~~>~p~n", [State]),
+  io:format("undefined tokenizer state ~~>~p~n", [State]),
   {error, State}.
 
 
 %%%%%%%%%%
 % parser %
 %%%%%%%%%%
-parse(Stack) ->
-  parse(Stack, nil, normal).
 
-parse([{word, Name} | T0], nil, normal) ->
-  {Children, [mark, T]} = lists:splitwith(fun(X) -> X =/= mark end, T0),
-  Node = #node{name = Name, children = Children},
-  parse([Node | T], nil, normal);
+parse(Tokens = [{word, _} | _]) ->
+  parse(lists:reverse(Tokens));
+parse(Tokens) ->
+  try
+    {ok, parse(Tokens, [])}
+  catch
+    {error, _Reason} = Res -> Res
+  end.
 
-parse(Stack, Acc, Mode) ->
-  State = #{
-    stack => Stack,
-    acc => Acc,
-    mode => Mode
-  },
-  io:format("undefined transform state ~~>~p~n", [State]),
-  {error, State}.
+parse([H = mark | T], Stack) ->
+  parse(T, [H | Stack]);
+parse([#string{value = Str} | T], Stack) ->
+  parse(T, [Str | Stack]);
+parse([H | T], Stack) when is_number(H) ->
+  parse(T, [H | Stack]);
+parse([H | T], Stack) when is_binary(H) ->
+  parse(T, [H | Stack]);
+parse([#word{name = Name} | T], Stack0) ->
+  {Children, Stack1} = popUntilAndDrop(mark, Stack0),
+  Node = #{Name => Children},
+  parse(T, [Node | Stack1]);
+parse([Map | T], Stack) when is_map(Map) ->
+  parse(T, [Map | Stack]);
+parse([], [Res]) ->
+  Res.
+
+popUntilAndDrop(Target, List) ->
+  {L, R} = popUntilAndDrop(Target, List, []),
+  {lists:reverse(L), R}.
+
+-spec popUntilAndDrop(Target, List, Acc) -> {ReversedPoppedList, RestList} when
+  Target :: T,
+  List :: [T],
+  Acc :: [T],
+  ReversedPoppedList :: [T],
+  RestList :: [T],
+  T :: term().
+
+popUntilAndDrop(_, [], Acc) ->
+  {Acc, []};
+popUntilAndDrop(Target, [Target | T], Acc) ->
+  {Acc, T};
+popUntilAndDrop(Target, [H | T], Acc) ->
+  popUntilAndDrop(Target, T, [H | Acc]).

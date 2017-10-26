@@ -3,6 +3,21 @@
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
+-define(Data,
+  #{"root" => [
+    #{"things"=>[
+      "hello",
+      "I",
+      <<"like">>,
+      200
+    ]},
+    "child"
+  ]}).
+
+-define(Raw,
+  <<"[ \"child\" [ 200 '4:like' \"I\" \"hello\" things root">>
+).
+
 start_trace() ->
   dbg:start(),
   dbg:tracer(),
@@ -10,9 +25,5 @@ start_trace() ->
   dbg:p(all, c).
 
 decode_test() ->
-  {ok, Res} = stackish:decode(<<"[ \"child\" [ 200 '4:like' \"I\" \"hello\" things root">>),
-  Ans = {root, [
-    {things, ["hello", "I", <<"like">>, 200]},
-    "child"
-  ]},
-  ?assertEqual(Ans, Res).
+  {ok, Res} = stackish:decode(?Raw),
+  ?assertEqual(?Data, Res).

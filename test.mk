@@ -6,7 +6,8 @@ build:
 
 decode: build
 	cd src && \
+		#stackish_test:start_trace(), \
 	echo "\
-		stackish_test:start_trace(), \
-		stackish_test:decode_test(). \
-		" | erl
+		stackish_test:decode_test(), \
+		io:format(\"All Passed.~n\"), \
+		halt()." | erl
