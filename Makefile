@@ -1,8 +1,8 @@
 PROJECT = stackish
-PROJECT_DESCRIPTION = New project
+PROJECT_DESCRIPTION = stackish decode and encode library in Erlang
 PROJECT_VERSION = 0.1.0
 
-DEPS = 
+DEPS =
 
 include erlang.mk
 include test.mk

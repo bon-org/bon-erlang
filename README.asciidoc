@@ -1,1 +1,3 @@
 = stackish
+
+stackish decode and encode library in Erlang
