@@ -1,6 +1,6 @@
 -module(stackish).
 
--export([decode/1, encode/1]).
+-export([decode/1, encode/1, encode/2]).
 
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
@@ -35,22 +35,32 @@
 
 -spec decode(bitstring()) -> stackish_value().
 
-decode(Value) when is_binary(Value) ->
-  case tokenize(Value) of
+decode(Bin) when is_binary(Bin) ->
+  case tokenize(Bin) of
     {ok, Stack} -> parse(Stack);
     Res = {error, _Reason} -> Res
   end.
 
--spec encode(stackish_value()) -> bitstring().
+-spec encode(stackish_value()) -> iolist().
 
-encode(BitString) ->
-  stringify(BitString).
+encode(Data) ->
+  try
+    {ok, stringify(Data)}
+  catch
+    {error, _Reason} = E -> E
+  end.
+
+encode(compact, Data) ->
+  case encode(Data) of
+    {ok, Bin} -> {ok, iolist_to_binary(Bin)};
+    X -> X
+  end.
 
 %%%%%%%%%%%%%%
 %% Internal %%
 %%%%%%%%%%%%%%
 
--define(is_digit(B),
+- define(is_digit(B),
   48 =< B andalso B =< 57
 ).
 -define(is_alphabet(B),
@@ -221,6 +231,7 @@ stringify({string, Str}) when is_list(Str) ->
 
 
 stringify(Atom) when is_atom(Atom) ->
+%%  [atom_to_list(Atom)];
   stringify({string, atom_to_list(Atom)});
 
 stringify(Binary) when is_binary(Binary) ->
@@ -234,14 +245,47 @@ stringify(A) when is_float(A) ->
   [float_to_binary(A)];
 
 stringify(Map) when is_map(Map) ->
-  Bs = lists:map(fun stackish:stringify/1, maps:keys(Map)),
-  throw(not_impl);
+  stringify_map(Map);
 
-stringify(A) when is_list(A) ->
-  throw(not_impl);
+stringify(List) when is_list(List) ->
+  case io_lib:char_list(List) of
+    true ->
+      [$", list_to_bitstring(List), $"];
+    false ->
+      [$  | Res] = lists:foldl(
+        fun(C, Acc) ->
+          Res = stringify(C),
+          [$ , Res, Acc]
+        end, [], List),
+      Res
+  end;
 
 stringify(_A) ->
   throw(not_impl).
+
+stringify_list([], Acc) ->
+  Acc;
+stringify_list([H | T], Acc) ->
+  Head = stringify(H),
+  stringify_list(T, [Head | Acc]).
+
+to_word(Atom) when is_atom(Atom) ->
+  list_to_bitstring(atom_to_list(Atom));
+to_word(Bin) when is_binary(Bin) ->
+  Bin;
+to_word(Str) when is_list(Str) ->
+  true = io_lib:char_list(Str),
+  list_to_bitstring(Str).
+
+
+stringify_map(Map) when is_map(Map) ->
+  [$  | Res] = maps:fold(
+    fun(K, V, Acc) ->
+      Other = stringify(V),
+      Self = to_word(K),
+      [$ , $[, $ , Other, $ , Self, Acc]
+    end, [], Map),
+  Res.
 
 serialize(Node = #node{next_sibling = S}) when ?has_sibling(Node) ->
   Others = serialize(S),
