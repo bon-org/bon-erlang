@@ -2,6 +2,11 @@
 
 -export([decode/1, encode/1]).
 
+-include_lib("eunit/include/eunit.hrl").
+-compile(export_all).
+
+%% external
+
 -type stackish_value() :: true
 | false
 | stackish_string()
@@ -16,13 +21,13 @@
 
 -type stackish_map_key() :: stackish_string()|stackish_number().
 
+%% internal
 
-%%-record(node, {name, children}).
 -record(word, {name}).
 -record(string, {value}).
 
+-record(node, {value, name, parent, first_child, next_sibling}).
 
--compile(export_all).
 
 %%%%%%%%%
 %% API %%
@@ -181,6 +186,9 @@ popUntilAndDrop(Target, [H | T], Acc) ->
 % stringifier %
 %%%%%%%%%%%%%%%
 
+-define(has_sibling(Node), Node#node.next_sibling =/= undefined).
+-define(has_child(Node), Node#node.first_child =/= undefined andalso is_record(Node#node.first_child, node)).
+
 -spec stringify(stackish_value()) -> iolist().
 
 stringify(true) ->
@@ -235,23 +243,20 @@ stringify(A) when is_list(A) ->
 stringify(_A) ->
   throw(not_impl).
 
--record(node, {value, name, parent, first_child, next_sibling}).
--define(has_sibling(Node), Node#node.next_sibling =/= undefined).
--define(has_child(Node), Node#node.first_child =/= undefined andalso is_record(Node#node.first_child, node)).
-
 serialize(Node = #node{next_sibling = S}) when ?has_sibling(Node) ->
   Others = serialize(S),
   Self = serialize(Node#node{next_sibling = undefined}),
-  [Self, $ , Others];
+  [Others, $ , Self];
 
 serialize(Node = #node{first_child = Child, name = Name}) when ?has_child(Node) ->
   Other = serialize(Child),
   Self = case Name of
            undefined -> $];
            S when is_list(S) -> list_to_bitstring(S);
-           Bin when is_binary(Bin) -> Bin
+           Bin when is_binary(Bin) -> Bin;
+           Atom when is_atom(Atom) -> list_to_bitstring(atom_to_list(Atom))
          end,
-  [Self, $ , Other];
+  [$[, $ , Other, $ , Self];
 
 serialize(#node{value = Bin}) when is_binary(Bin) ->
   Len = integer_to_binary(byte_size(Bin)),
@@ -265,49 +270,33 @@ serialize(#node{value = Num}) when is_number(Num) ->
           is_integer(Num) -> integer_to_binary(Num);
           is_float(Num) -> float_to_binary(Num)
         end,
-  [Str];
-
-serialize(X) ->
-  throw(not_impl).
+  [Str].
 
 serialize_test() ->
-  C2 = #node{value = <<"child">>},
+  C2 = #node{value = "child"},
 
   N4 = #node{value = 200},
   N3 = #node{value = <<"like">>, next_sibling = N4},
   N2 = #node{value = "I", next_sibling = N3},
   N1 = #node{value = "hello", next_sibling = N2},
-  C1 = #node{name = <<"things">>, first_child = N1, next_sibling = C2},
+  C1 = #node{name = things, first_child = N1, next_sibling = C2},
 
-  R = #node{name = <<"root">>, first_child = C1},
+  R = #node{name = root, first_child = C1},
 
-  Print =
-    fun(Name, V0) ->
-      Pat = iolist_to_binary([Name, " ~> "]),
-      V = lists:flatten(V0),
-      Res = lists:flatten([Pat, V]),
-      io:format(Res ++ "~n")
+  Run =
+    fun(_Name, Input) ->
+%%      io:format("~p : ~p~n", [_Name, Input]),
+      Output = lists:flatten(serialize(Input)),
+      Res = lists:flatten(Output),
+%%      io:format("  ~~> " ++ Res ++ "~n"),
+      iolist_to_binary(Res)
     end,
-  Print("N4", serialize(N4)),
-  Print("N3", serialize(N3)),
-  Print("N2", serialize(N2)),
-  Print("N1", serialize(N1)),
-  Print("C1", serialize(C1)),
-  io:format("-------------------------~n").
-
-% for debug
-to_string(Xs) ->
-  lists:reverse(to_string(Xs, [])).
-
-to_string([], Acc) ->
-  Acc;
-to_string([H | T], Acc) when is_integer(H) ->
-  to_string(T, [H | Acc]);
-to_string([H | T], Acc) when is_binary(H) ->
-  Bin = binary_to_list(H),
-  Bs = lists:reverse(Bin),
-  NewAcc = lists:flatten([Bs, Acc]),
-  to_string(T, NewAcc).
+  ?assertEqual(<<"200">>, Run("N4", N4)),
+  ?assertEqual(<<"200 '4:like'">>, Run("N3", N3)),
+  ?assertEqual(<<"200 '4:like' \"I\"">>, Run("N2", N2)),
+  ?assertEqual(<<"200 '4:like' \"I\" \"hello\"">>, Run("N1", N1)),
+  ?assertEqual(<<"\"child\" [ 200 '4:like' \"I\" \"hello\" things">>, Run("C1", C1)),
+  ?assertEqual(<<"[ \"child\" [ 200 '4:like' \"I\" \"hello\" things root">>, Run("R", R)).
 
 debug() ->
   dbg:start(),
