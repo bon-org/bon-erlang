@@ -41,7 +41,7 @@ encode_test() ->
 
 data_test(Data) ->
   io:format("Data=~p~n", [Data]),
-  {ok, Bin} = stackish:encode(compact, Data),
+  {ok, Bin} = stackish:encode(Data,[no_iolist]),
   io:format("Bin=~p~n", [Bin]),
   {ok, Res} = stackish:decode(Bin),
   ?assertEqual(Data, Res),

@@ -1,3 +1,70 @@
-= stackish
+= stackish =
 
-stackish decode and encode library in Erlang
+Stackish decode and encode library in Erlang.
+
+This library is deprecated due to the mis-match of Erlang term and Stackish Data Type.
+The npm package https://www.npmjs.com/package/erlang[erlang] is more preferable. When using websocket.
+
+== The Mapping between erlang term and stackish ==
+
+.Data Type Mapping Table
+[options="header"]
+|=======================
+| Erlang    | Stackish
+
+| integer   | number
+| float     | float
+| char_list | string
+| map/list  | mark
+| map key   | word
+| list      | group
+| map value | attribute
+| binary    | blob*
+|=======================
+
+=== Tricky part ===
+
+==== 1. String and Blob Ambiguous ====
+
+All of following listed can be blob in stackish :
+
+- atom
+- bitstring
+- binary
+
+To resolve this ambiguous (e.g. Erlang <--> Stackish <--> Javascript),
+the blob format is modified as describe below.
+
+.Modified Blob Representation
+|==========================================
+| Erlang    | Stackish  | Javascript
+
+| foo       | 'a:3:foo' | Symbol.for('foo')
+| <<"foo">> | 'b:3:foo' | new Blob("foo")
+| "foo"     | "foo"     | "foo"
+|==========================================
+
+But there are still ambiguous condition since erlang do not support string at language level,
+i.e. `"ABC"` is not distinctive from `[65, 66, 67]`.
+
+By convention, the 'real string' is Erlang could be `<<"ABC">>`,
+which then become undistinguished from the real binary blob of `<< 65, 66, 67 >>`,
+in this case, application context may helps.
+
+==== 2. Map Key Conflict ====
+
+In stackish, the word must begins with alphabet, i.e. numeric nor string keys are not allowed.
+But in erlang, map key can be any erlang term, including number, atom, list and binary.
+
+To fix this issue, the word must be prefix with type info.
+
+.Modified Word Representation
+|============================
+| Erlang | Stackish | Javascript
+
+| foo       | afoo  | Symbol.for(foo)
+| "foo"     | sfoo  | "foo"
+| <<"foo">> | bfoo  | "foo"
+|============================
+
+Other types of key are not supported, including map, tuple.

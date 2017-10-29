@@ -7,6 +7,9 @@
 
 %% external
 
+-type stackish_options() :: [no_iolist|wrap_atom|existing_atom].
+-define(default_options, [wrap_atom, existing_atom]).
+
 -type stackish_value() :: true
 | false
 | stackish_string()
@@ -44,16 +47,20 @@ decode(Bin) when is_binary(Bin) ->
 -spec encode(stackish_value()) -> iolist().
 
 encode(Data) ->
+  encode(Data, #{}).
+
+encode(Data, Opts) ->
   try
-    {ok, stringify(Data)}
+    Res = lists:foldl(
+      fun(Opt, Res) ->
+        case Opt of
+          no_iolist -> iolist_to_binary(Res);
+          _ -> Res
+        end
+      end, stringify(Data, Opts), Opts),
+    {ok, Res}
   catch
     {error, _Reason} = E -> E
-  end.
-
-encode(compact, Data) ->
-  case encode(Data) of
-    {ok, Bin} -> {ok, iolist_to_binary(Bin)};
-    X -> X
   end.
 
 %%%%%%%%%%%%%%
@@ -199,11 +206,11 @@ popUntilAndDrop(Target, [H | T], Acc) ->
 -define(has_sibling(Node), Node#node.next_sibling =/= undefined).
 -define(has_child(Node), Node#node.first_child =/= undefined andalso is_record(Node#node.first_child, node)).
 
--spec stringify(stackish_value()) -> iolist().
+-spec stringify(stackish_value(), stackish_options()) -> iolist().
 
-stringify(true) ->
+stringify(true,_) ->
   [<<"true">>];
-stringify(false) ->
+stringify(false,_) ->
   [<<"false">>];
 
 stringify({word, Name}) ->

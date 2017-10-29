@@ -1,4 +1,4 @@
-test: build decode encode
+test: build decode encode data
 
 build:
 	cd src && \
@@ -6,7 +6,6 @@ build:
 
 decode: build
 	cd src && \
-		#stackish_test:start_trace(), \
 	echo "\
 		stackish_test:decode_test(), \
 		io:format(\"Passed decode test.~n\"), \
@@ -14,8 +13,13 @@ decode: build
 
 encode: build
 	cd src && \
-		#stackish_test:start_trace(), \
 	echo "\
 		stackish_test:encode_test(), \
 		io:format(\"Passed encode test.~n\"), \
+		halt()." | erl
+
+data: build
+	cd src && \
+		echo "\
+		stackish_test:data_test(), \
 		halt()." | erl
