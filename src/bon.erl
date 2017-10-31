@@ -209,14 +209,26 @@ parse([H | T0], Acc) when ?is_alphabet(H) ->
   Word = #word{name = Name},
   {Word, T1, Acc};
 
-parse(List, Acc) when is_list(List), is_list(Acc) ->
-  io:format("parse(~w, ~w)~n", [List, Acc]),
-  throw(not_impl).
+%% string
+parse([$" | T0], Acc) ->
+  {Str, T1} = parse_string(T0, ""),
+  parse(T1, [Str | Acc]).
 
-%%skip_space([$  | T]) ->
-%%  skip_space(T);
-%%skip_space(List) when is_list(List) ->
-%%  List.
+
+%%%%%%%%%%%%%%%%%%%%%%
+%% Helper Functions %%
+%%%%%%%%%%%%%%%%%%%%%%
+
+-spec parse_string(list(), [char()]) -> {[char()], list()}.
+
+parse_string([], Acc) ->
+  {lists:reverse(Acc), []};
+parse_string([$\\, $" | T], Acc) ->
+  parse_string(T, [$" | Acc]);
+parse_string([$" | T], Acc) ->
+  {lists:reverse(Acc), T};
+parse_string([H | T], Acc) ->
+  parse_string(T, [H | Acc]).
 
 -spec parse_word(list(), [char()]) -> {[char()], list()}.
 
@@ -230,8 +242,9 @@ parse_word(Tail, Acc) when is_list(Tail) ->
 
 parse_number([H | T], Acc, Count) when ?is_digit(H) ->
   parse_number(T, Acc * 10 + (H - $0), Count);
-parse_number([$/, H | T], Acc, 1) when ?is_digit(H) ->
-  {Acc / parse_number(T, H - $0, 2), T};
+parse_number([$/, H | T0], Acc, 1) when ?is_digit(H) ->
+  {Q, T1} = parse_number(T0, H - $0, 2),
+  {Acc / Q, T1};
 parse_number(List, Acc, Count) when is_list(List), is_number(Acc), (Count == 1) or (Count == 2) ->
   {Acc, List}.
 
