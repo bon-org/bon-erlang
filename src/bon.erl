@@ -59,7 +59,8 @@ data_test() ->
     #{user=>"name", pw=>"123"},
     #{12=>34, "user"=>name},
     #{log=>[#{time=> 123}, #{time=> 234}]}
-  ]).
+  ]),
+  ok.
 
 
 %%%%%%%%%%%%%%
@@ -276,7 +277,7 @@ gcd(A, B) -> gcd(B, A rem B).
 
 list_to_map([], Acc) when is_map(Acc) ->
   Acc;
-list_to_map([V, K | T], Acc) ->
+list_to_map([K, V | T], Acc) ->
   list_to_map(T, maps:put(K, V, Acc)).
 
 debug() ->
