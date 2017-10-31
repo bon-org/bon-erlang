@@ -15,7 +15,9 @@
 -export([encode/1, decode/1, decode_all/1]).
 
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
+%%-compile(export_all).
+-export([data_test/1,fac_test/1,serialize_test/1]).
+-export([debug/0,debug2/0]).
 
 -define(list_to_atom(X), erlang:list_to_existing_atom(X)).
 
@@ -76,6 +78,10 @@ decode_all(List, Acc) when is_list(List), is_list(Acc) ->
 is_string(X) ->
   io_lib:printable_unicode_list(X).
 
+-define(WORD_TUPLE, "t").
+-define(WORD_LIST, "l").
+-define(WORD_MAP, "m").
+
 %%%%%%%%%%%%%%
 % serializer %
 %%%%%%%%%%%%%%
@@ -104,7 +110,7 @@ serialize(Tuple) when is_tuple(Tuple) ->
   List = erlang:tuple_to_list(Tuple),
 %%  Children = lists:map(fun serialize/1, List),
   Children = serialize_list(List),
-  [$[, Children, $ , $t, $ ];
+  [$[, Children, $ , ?WORD_TUPLE, $ ];
 
 serialize(List) when is_list(List) ->
   case is_string(List) of
@@ -114,7 +120,7 @@ serialize(List) when is_list(List) ->
     false ->
 %%      Children = lists:map(fun serialize/1, List),
       Children = serialize_list(List),
-      [$[, Children, $ , $l, $ ]
+      [$[, Children, $ , ?WORD_LIST, $ ]
   end;
 
 serialize(Map) when is_map(Map) ->
@@ -124,7 +130,7 @@ serialize(Map) when is_map(Map) ->
       V_Bin = serialize(V),
       [V_Bin, K_Bin | Acc]
     end, [], Map),
-  [$[, Children, $ , $m, $ ].
+  [$[, Children, $ , ?WORD_MAP, $ ].
 
 serialize_list(List) when is_list(List) ->
   lists:foldl(
@@ -135,9 +141,6 @@ serialize_list(List) when is_list(List) ->
 
 quote_string_char($") -> [$\\, $"];
 quote_string_char(C) -> C.
-
-unquote_string_char([$\\, $"]) -> $";
-unquote_string_char(C) -> C.
 
 serialize_test(X) ->
   Res =
@@ -199,9 +202,9 @@ parse([$', $b, $:, H | T0], Acc) when ?is_digit(H) ->
 parse([$[ | T0], Acc) ->
   {#word{name = Name}, T1, Children} = parse(T0, []),
   Res = case Name of
-          "t" -> erlang:list_to_tuple(Children);
-          "l" -> Children;
-          "m" -> list_to_map(Children, #{})
+          ?WORD_TUPLE -> erlang:list_to_tuple(Children);
+          ?WORD_LIST -> Children;
+          ?WORD_MAP -> list_to_map(Children, #{})
         end,
   parse(T1, [Res | Acc]);
 

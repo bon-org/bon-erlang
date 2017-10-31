@@ -4,6 +4,14 @@ build:
 	cd src && \
 		erlc *.erl
 
+test_bon:
+	cd src && \
+		echo "\
+		c(bon), \
+		bon:data_test(), \
+		io:format(\"ok~n\"), \
+		halt()." | erl
+
 decode: build
 	cd src && \
 	echo "\
