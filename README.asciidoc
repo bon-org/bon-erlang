@@ -30,5 +30,22 @@ floating number is represented in rational format (of integer), e.g. 314/100
 | map       | map group       | object
 |=========================================
 
+== Examples ==
+
+.BON data type representation
+|==============================
+| Data Type       | BON Example
+
+| integer         | 42
+| rational number | 157/50
+| atom blob       | 'a:3:foo'
+| binary blob     | 'b:4:text'
+| tuple group     | [ 3 2 1 t
+| list group      | [ 3 2 1 l
+| string          | "foo"
+| map group       | [ "admin" "user" "123" "pw" m
+|==============================
+
+
 == TODO ==
 1. Add support to set (and dict?)
