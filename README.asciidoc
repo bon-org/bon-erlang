@@ -1,70 +1,34 @@
-= stackish =
+= BON =
 
-Stackish decode and encode library in Erlang.
+Binary Object Notation,
+A.K.A. Beeno Object Notation
 
-This library is deprecated due to the mis-match of Erlang term and Stackish Data Type.
-The npm package https://www.npmjs.com/package/erlang[erlang] is more preferable. When using websocket.
+Based on stackish.
 
-== The Mapping between erlang term and stackish ==
+Designed to enable loss-less data exchange between Erlang to Javascript.
+
+Loss-less means it will not mess up tuple and list, nor atom and hashmap key
+
+integer is represented in dec format, e.g. 42
+floating number is represented in rational format (of integer), e.g. 314/100
+
+
+== The Mapping between Erlang term, BON and Javascript term ==
 
 .Data Type Mapping Table
 [options="header"]
-|=======================
-| Erlang    | Stackish
+|=========================================
+| Erlang    | Stackish        | Javascript
 
-| integer   | number
-| float     | float
-| char_list | string
-| map/list  | mark
-| map key   | word
-| list      | group
-| map value | attribute
-| binary    | blob*
-|=======================
+| integer   | integer         | number
+| float     | rational number | number
+| atom      | atom blob       | Symbol
+| binary    | binary blob     | Blob
+| tuple     | tuple group     | Tuple
+| list      | list group      | Array
+| char_list | string          | string
+| map       | map group       | object
+|=========================================
 
-=== Tricky part ===
-
-==== 1. String and Blob Ambiguous ====
-
-All of following listed can be blob in stackish :
-
-- atom
-- bitstring
-- binary
-
-To resolve this ambiguous (e.g. Erlang <--> Stackish <--> Javascript),
-the blob format is modified as describe below.
-
-.Modified Blob Representation
-|==========================================
-| Erlang    | Stackish  | Javascript
-
-| foo       | 'a:3:foo' | Symbol.for('foo')
-| <<"foo">> | 'b:3:foo' | new Blob("foo")
-| "foo"     | "foo"     | "foo"
-|==========================================
-
-But there are still ambiguous condition since erlang do not support string at language level,
-i.e. `"ABC"` is not distinctive from `[65, 66, 67]`.
-
-By convention, the 'real string' is Erlang could be `<<"ABC">>`,
-which then become undistinguished from the real binary blob of `<< 65, 66, 67 >>`,
-in this case, application context may helps.
-
-==== 2. Map Key Conflict ====
-
-In stackish, the word must begins with alphabet, i.e. numeric nor string keys are not allowed.
-But in erlang, map key can be any erlang term, including number, atom, list and binary.
-
-To fix this issue, the word must be prefix with type info.
-
-.Modified Word Representation
-|============================
-| Erlang | Stackish | Javascript
-
-| foo       | afoo  | Symbol.for(foo)
-| "foo"     | sfoo  | "foo"
-| <<"foo">> | bfoo  | "foo"
-|============================
-
-Other types of key are not supported, including map, tuple.
+== TODO ==
+1. Add support to set (and dict?)
