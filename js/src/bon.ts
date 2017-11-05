@@ -7,19 +7,19 @@ export function encode(Data): IOList {
 }
 
 export function decode(IOList_Bin) {
-    const type = type_of(IOList_Bin);
-    switch (type) {
+    const Type = type_of(IOList_Bin);
+    switch (Type) {
         case "list":
             return decode(iolist_to_binary(IOList_Bin));
         case "binary":
-            const list = binary_to_list(IOList_Bin);
-            const tup = parse(list, EmptyList);
-            if (tup.value[0] != EmptyList) {
-                throw new TypeError("stream is not fully consumed: " + util.inspect(tup));
+            const List = binary_to_list(IOList_Bin);
+            const [Rest, Res] = parse(List, EmptyList);
+            if (Rest != EmptyList) {
+                throw new TypeError("stream is not fully consumed: " + util.inspect({List, Rest, Res}));
             }
-            return tup.value[1];
+            return Res;
         default:
-            throw new TypeError("invalid type: " + type);
+            throw new TypeError("invalid type: " + Type);
     }
 }
 
@@ -37,6 +37,8 @@ export function data_test(Data?) {
         return "ok";
     }
     return [42,
+        -72,
+        1.5,
         3.14,
         Atom("atom"),
         "AB",
@@ -91,8 +93,12 @@ export class List {
 }
 
 namespace lists {
-    export function reverse(list: List, acc: List = EmptyList) {
-        return list == EmptyList ? acc : reverse(list.tail, acc.append(list.value));
+    export function reverse(list: List) {
+        return reverse2(list, EmptyList);
+    }
+
+    function reverse2(list: List, acc: List) {
+        return list == EmptyList ? acc : reverse2(list.tail, acc.append(list.value));
     }
 
     export function walk(list: List, f: (x) => void) {
@@ -110,7 +116,7 @@ namespace format {
             return "[]";
         }
         if (list.tail == EmptyList) {
-            return `[${list.value}]`;
+            return "[" + util.inspect(list.value) + "]";
         }
         let res = "[" + util.inspect(list.value);
         lists.walk(list.tail, x => res += "," + util.inspect(x));
@@ -149,7 +155,8 @@ namespace format {
 const EmptyList = new List(undefined, undefined);
 
 function array_to_list(Arr: any[]) {
-    return Arr.reduce((acc, c) => acc.append(c), EmptyList);
+    const res = Arr.reduce((acc, c) => acc.append(c), EmptyList);
+    return lists.reverse(res);
 }
 
 function list_to_array(list: List): any[] {
@@ -163,7 +170,11 @@ function array_to_tuple(Arr: any[]) {
 }
 
 function list(...args) {
-    return array_to_list(args);
+    let acc = EmptyList;
+    for (let i = args.length - 1; i >= 0; i--) {
+        acc = acc.append(args[i]);
+    }
+    return acc;
 }
 
 function tuple(...args) {
@@ -180,11 +191,12 @@ function string_to_binary(str: string): Binary {
 
 export type IOList = List;
 
-function integer_to_binary(x: int): Binary {
+function integer_to_iolist(x: int): IOList {
     assert(type_of(x) == "int", "expect integer: " + util.inspect(x));
     let acc = EmptyList;
+    let neg = false;
     if (x < 0) {
-        acc = acc.append(char_code["-"]);
+        neg = true;
         x = -x;
     }
     for (; x != 0;) {
@@ -192,7 +204,7 @@ function integer_to_binary(x: int): Binary {
         acc = acc.append(rem + 48);
         x = (x - rem) / 10;
     }
-    return new Binary(Uint8Array.from(list_to_array(acc)));
+    return neg ? acc.append(char_code["-"]) : acc;
 }
 
 function type_of(Data) {
@@ -229,7 +241,7 @@ function iolist_to_binary(List: List): Binary {
     return new Binary(Uint8Array.from(res));
 }
 
-function iolist_to_binary_walk(list: List, acc: number[]): number[] {
+function iolist_to_binary_walk(list: IOList, acc: number[]): number[] {
     if (list == EmptyList) {
         return acc;
     }
@@ -237,6 +249,9 @@ function iolist_to_binary_walk(list: List, acc: number[]): number[] {
     switch (type) {
         case "binary":
             (list.value as Binary).value.forEach(x => acc.push(x));
+            break;
+        case "list":
+            iolist_to_binary_walk(list.value as IOList, acc);
             break;
         default:
             acc.push(list.value);
@@ -261,11 +276,12 @@ export function serialize(Data): IOList {
     const type = type_of(Data);
     switch (type) {
         case "int":
-            return list(32, integer_to_binary(Data), 32);
+            return list(32, integer_to_iolist(Data), 32);
         case "float":
             const [A, B] = fac(Data);
-            return B == 1 ? list(32, integer_to_binary(A), 32)
-                : list(32, integer_to_binary(A), char_code["/"], integer_to_binary(B), 32);
+            const Bin = B == 1 ? integer_to_iolist(A)
+                : list(integer_to_iolist(A), char_code["/"], integer_to_iolist(B));
+            return list(32, Bin, 32);
         default:
             throw new TypeError("unknown type: " + type);
     }
@@ -279,13 +295,13 @@ function assert(bool: boolean, msg: string) {
 
 /* parser */
 
-function parse(list: List, acc: List) {
-    console.debug(`parse(${list}, ${acc})`);
+function parse(list: List, acc: List): [List, any] {
+    // console.debug("parse:", list, acc);
     if (list == EmptyList) {
         assert(acc.tail == EmptyList, "invalid list");
-        return tuple(list, acc.value);
+        return [list, acc.value];
     }
-    if (list.value == char_code(" ")) {
+    if (list.value == 32) {
         return parse(list.tail, acc);
     }
     if (is_digit(list.value)) {
@@ -301,14 +317,12 @@ function parse(list: List, acc: List) {
 }
 
 function parse_number(list: List, acc: number, count: number): [number, List] {
-    console.debug(`parse_number(${list}, ${acc}, ${count})`);
     if (list != EmptyList) {
         if (is_digit(list.value)) {
             return parse_number(list.tail, acc * 10 + (list.value - 48), count);
         }
-        if (list.value == char_code("/") && is_digit(list.tail.value) && count == 1) {
-            const [q, tail] = parse_number(list.tail, list.value - 48, 2);
-            console.debug("test: " + util.inspect({q, tail}));
+        if (list.value == char_code["/"] && is_digit(list.tail.value) && count == 1) {
+            const [q, tail] = parse_number(list.tail.tail, list.tail.value - 48, 2);
             return [acc / q, tail];
         }
     }
@@ -366,5 +380,5 @@ function char_code(s: string) {
 }
 
 function is_digit(c) {
-    return char_code("0") <= c && c <= char_code("9");
+    return 48 <= c && c <= (48 + 9);
 }
