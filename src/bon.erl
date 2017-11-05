@@ -16,8 +16,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 %%-compile(export_all).
--export([data_test/1,fac_test/1,serialize_test/1]).
--export([debug/0,debug2/0]).
+-export([data_test/1, fac_test/1, serialize_test/1]).
+-export([debug/0, debug2/0]).
 
 -define(list_to_atom(X), erlang:list_to_existing_atom(X)).
 
@@ -51,6 +51,7 @@ data_test(Data) ->
 data_test() ->
   lists:map(fun data_test/1, [
     42,
+    -72,
     3.14,
     atom,
     "AB",
@@ -182,7 +183,7 @@ parse([H | T], Acc) when ?is_digit(H) ->
   parse(Tail, [Num | Acc]);
 parse([$-, H | T], Acc) when ?is_digit(H) ->
   {Num, Tail} = parse_number(T, H - $0, 1),
-  parse(Tail, [Num | Acc]);
+  parse(Tail, [-Num | Acc]);
 
 %% atom
 parse([$', $a, $:, H | T0], Acc) when ?is_digit(H) ->
