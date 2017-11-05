@@ -15,7 +15,7 @@
     "pretest": "npm-run-all build lint || exit 0",
     "test": "node bon_test.js",
     "pretest:web": "npm run pretest",
-    "test:web": "browserify bon_test.js test/bon_test.js",
+    "test:web": "browserify bon_test.js > test/bon_test.js && xdg-open test/bon_test.html",
     "prepublishOnly": "npm run build",
     "precommit": "npm run fix-lint",
     "commit": "git gui",
