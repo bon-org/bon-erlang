@@ -58,7 +58,7 @@ export function data_test(Data?) {
 }
 
 /* Internal */
-function Atom(Str) {
+function Atom(Str: string) {
     return Symbol.for(Str);
 }
 
@@ -109,6 +109,14 @@ namespace lists {
         return walk(list.tail, f);
     }
 
+    export function split(Size: int, Res: List) {
+        let Acc = EmptyList;
+        for (; Size > 0; Size--) {
+            Acc = Acc.append(Res.value);
+            Res = Res.tail;
+        }
+        return [reverse(Acc), Res];
+    }
 }
 namespace format {
     export function list(list: List) {
@@ -132,6 +140,18 @@ namespace format {
     export function binary(bin: Binary) {
         return "<<" + bin.value.join(",") + ">>";
     }
+
+    export function atom(atom: symbol) {
+        const name = Symbol.keyFor(atom);
+        const c = name.charCodeAt(0);
+        return $a <= c && c <= $z
+            ? name
+            : "'" + name + "'";
+    }
+
+    export function symbol(s: symbol) {
+        return atom(s);
+    }
 }
 {
     const ori = util.inspect;
@@ -139,16 +159,9 @@ namespace format {
     u["inspect"] = function () {
         const x = arguments[0];
         const type = type_of(x);
-        switch (type) {
-            case "list":
-                return format.list(x);
-            case "tuple":
-                return format.tuple(x);
-            case "binary":
-                return format.binary(x);
-            default:
-                return ori.apply(util, arguments);
-        }
+        return typeof format[type] === "function"
+            ? format[type](x)
+            : ori.apply(util, arguments);
     };
 }
 
@@ -163,6 +176,16 @@ function list_to_array(list: List): any[] {
     const res = [];
     lists.walk(list, x => res.push(x));
     return res;
+}
+
+function list_to_string(list: List) {
+    let res = "";
+    lists.walk(list, x => res += String.fromCharCode(x));
+    return res;
+}
+
+function list_to_atom(list: List) {
+    return Atom(list_to_string(list));
 }
 
 function array_to_tuple(Arr: any[]) {
@@ -264,24 +287,27 @@ function binary_to_list(Bin: Binary): List {
     return lists.reverse(res);
 }
 
-function list_to_string(list: List) {
-    let res = "";
-    lists.walk(list, x => res += String.fromCharCode(x));
-    return res;
+function byte_size(Bin: Binary): number {
+    return Bin.value.byteLength;
 }
 
 /* serializer  */
-
 export function serialize(Data): IOList {
     const type = type_of(Data);
     switch (type) {
         case "int":
             return list(32, integer_to_iolist(Data), 32);
-        case "float":
+        case "float": {
             const [A, B] = fac(Data);
             const Bin = B == 1 ? integer_to_iolist(A)
                 : list(integer_to_iolist(A), char_code["/"], integer_to_iolist(B));
             return list(32, Bin, 32);
+        }
+        case "symbol": {
+            const Bin = string_to_binary(Symbol.keyFor(Data));
+            const Bin_Size = integer_to_iolist(byte_size(Bin));
+            return list($quote, $a, $colon, Bin_Size, $colon, Bin, $quote);
+        }
         default:
             throw new TypeError("unknown type: " + type);
     }
@@ -295,25 +321,55 @@ function assert(bool: boolean, msg: string) {
 
 /* parser */
 
-function parse(list: List, acc: List): [List, any] {
-    // console.debug("parse:", list, acc);
-    if (list == EmptyList) {
-        assert(acc.tail == EmptyList, "invalid list");
-        return [list, acc.value];
+function parse(List: List, Acc: List): [List, any] {
+    // console.debug("parse:", List, Acc);
+
+    /* finish */
+    if (List == EmptyList) {
+        assert(Acc.tail == EmptyList, "invalid list");
+        return [List, Acc.value];
     }
-    if (list.value == 32) {
-        return parse(list.tail, acc);
+
+    /* skip space */
+    if (List.value == 32) {
+        return parse(List.tail, Acc);
     }
-    if (is_digit(list.value)) {
-        const [num, tail] = parse_number(list.tail, list.value - 48, 1);
-        return parse(tail, acc.append(num));
+
+    /* number */
+    if (is_digit(List.value)) {
+        const [num, tail] = parse_number(List.tail, List.value - 48, 1);
+        return parse(tail, Acc.append(num));
     }
-    if (list.value == char_code["-"] && list.tail != EmptyList && is_digit(list.tail.value)) {
-        const [num, tail] = parse_number(list.tail.tail, list.tail.value - 48, 1);
-        return parse(tail, acc.append(-num));
+    if (List.value == char_code["-"] && List.tail != EmptyList && is_digit(List.tail.value)) {
+        const [num, tail] = parse_number(List.tail.tail, List.tail.value - 48, 1);
+        return parse(tail, Acc.append(-num));
     }
-    list = list_to_string(list) as any;
-    throw new Error("bad_arg: " + util.inspect({list, acc}));
+
+    /* atom */
+    {
+        const [is_match, T0] = parse_head(list($quote, $a, $colon), List);
+        if (is_match && is_digit(T0.value)) {
+            const [Size, T1] = parse_number(T0.tail, T0.value - 48, 2);
+            assert(T1.value == $colon, "invalid atom expr (1)");
+            const [List, T2] = lists.split(Size, T1.tail);
+            assert(T2.value == $quote, "invalid atom expr (2)");
+            const Atom = list_to_atom(List);
+            return parse(T2.tail, Acc.append(Atom));
+        }
+    }
+
+    /* not impl */
+    List = list_to_string(List) as any;
+    throw new Error("bad_arg: " + util.inspect({List, Acc}));
+}
+
+function parse_head(Token: List, List: List): [boolean, List] {
+    if (Token == EmptyList) {
+        return [true, List];
+    }
+    return Token.value == List.value
+        ? parse_head(Token.tail, List.tail)
+        : [false, List];
 }
 
 function parse_number(list: List, acc: number, count: number): [number, List] {
@@ -331,6 +387,7 @@ function parse_number(list: List, acc: number, count: number): [number, List] {
 
 type float = number;
 type int = number;
+type atom = symbol;
 
 function fac(F: float) {
     if (F == 1) {
@@ -378,6 +435,12 @@ function char_code(s: string) {
         char_code[i] = s;
     }
 }
+const $colon = char_code[":"];
+const $quote = char_code["'"];
+const $double_quote = char_code['"'];
+const $a = char_code["a"];
+const $b = char_code["b"];
+const $z = char_code["z"];
 
 function is_digit(c) {
     return 48 <= c && c <= (48 + 9);
