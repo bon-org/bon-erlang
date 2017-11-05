@@ -131,7 +131,8 @@ module format {
 }
 {
     const ori = util.inspect;
-    util.inspect = function () {
+    const u = util as any;
+    u['inspect'] = function () {
         let x = arguments[0];
         const type = type_of(x);
         switch (type) {
@@ -246,7 +247,7 @@ function parse(list: List, acc: List) {
             assert(tup.value.length == 2, "invalid tuple");
             return parse(tup.value[1], acc.append(tup.value[0]));
         }
-        return parse(list.tail, acc.append())
+        throw new Error("bad_arg");
     }
 }
 
@@ -263,6 +264,48 @@ function parse_number(list: List, acc: number, count: number) {
         }
     }
     return tuple(acc, list);
+}
+
+type float = number;
+type int = number;
+
+function fac(F: float) {
+    if (F == 1) {
+        return [1, 1]
+    } else if (F < 1) {
+        const [A, B] = fac(1 / F);
+        return fac2(B, A);
+    } else {
+        const [A, B] = fac_power_up(F, 1);
+        return fac2(A, B);
+    }
+}
+
+export function fac_test(F) {
+    const [A, B] = fac(F);
+    const Diff = Math.abs(F - A / B);
+    return Diff / F;
+}
+
+function fac2(A: int, B: int) {
+    const D = gcd(A, B);
+    return [round(A / D), round(B / D)];
+}
+
+const round = Math.round.bind(Math);
+
+function fac_power_up(F: float, Acc: int) {
+    if (Math.round(F) == F) {
+        return [Math.round(F), Acc];
+    } else {
+        return fac_power_up(F * 10, Acc * 10);
+    }
+}
+
+function gcd(A: int, B: int): int {
+    return A == 0 ? B
+        : B == 0 ? A
+            : gcd(B, A % B);
 }
 
 function char_code(s: string) {
