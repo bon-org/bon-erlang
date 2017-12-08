@@ -12,10 +12,14 @@
 
 -module(bon).
 
+%% API
 -export([encode/1, decode/1, decode_all/1]).
 
+%% Util
+-export([fac/1]).
+
+%% Testing
 -include_lib("eunit/include/eunit.hrl").
-%%-compile(export_all).
 -export([data_test/1, fac_test/1, serialize_test/1]).
 -export([debug/0, debug2/0]).
 
@@ -49,7 +53,7 @@ data_test(Data) ->
   ?assertEqual(Data, decode(encode(Data))).
 
 data_test() ->
-  lists:map(fun data_test/1, [
+  lists:foreach(fun data_test/1, [
     42,
     -72,
     3.14,
