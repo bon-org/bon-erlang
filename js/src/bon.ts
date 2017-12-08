@@ -152,6 +152,14 @@ namespace format {
     export function symbol(s: symbol) {
         return atom(s);
     }
+
+    export function object(o: any) {
+        return "#{"
+            + Object.keys(o)
+                .map(k => util.inspect(k) + " => " + util.inspect(o[k]))
+                .join(",")
+            + "}";
+    }
 }
 {
     const ori = util.inspect;
@@ -308,6 +316,10 @@ export function serialize(Data): IOList {
             const Bin_Size = integer_to_iolist(byte_size(Bin));
             return list($quote, $a, $colon, Bin_Size, $colon, Bin, $quote);
         }
+        case "string": {
+            const Str = (Data as string).split('"').join('\\"');
+            return list($double_quote, Str, $double_quote);
+        }
         default:
             throw new TypeError("unknown type: " + type);
     }
@@ -359,7 +371,7 @@ function parse(List: List, Acc: List): [List, any] {
     }
 
     /* not impl */
-    List = list_to_string(List) as any;
+    // List = list_to_string(List) as any;
     throw new Error("bad_arg: " + util.inspect({List, Acc}));
 }
 
