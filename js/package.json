@@ -1,6 +1,6 @@
 {
   "name": "@beenotung/bon",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "BON - Binary Object Notation, A.K.A. Beeno Object Notation. For Erlang and Javascript Data Exchange",
   "main": "dist/index.js",
   "author": "Beeno Tung",
@@ -49,7 +49,7 @@
   "directories": {
     "test": "test"
   },
- "repository": {
+  "repository": {
     "type": "git",
     "url": "git+https://github.com/beenotung/bon.git"
   },
