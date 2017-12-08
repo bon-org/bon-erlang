@@ -1,6 +1,7 @@
 import * as util from "util";
 import {
     Atom,
+    Binary,
     binary_to_list,
     byte_size,
     EmptyList,
@@ -52,7 +53,30 @@ export function decode(IOList_Bin) {
     }
 }
 
-export function decode_all(Data) {
+export function decode_all(Data: IOList | Binary | List, Acc: List) {
+    if (Data instanceof List && !Acc) {
+        const IOList = Data as IOList;
+        return decode(iolist_to_binary(IOList));
+    } else if (Data instanceof Binary && !Acc) {
+        const Bin = Data as Binary;
+        const List = binary_to_list(Bin);
+        return decode_all(List, EmptyList);
+    } else if (Data instanceof List && Acc instanceof List) {
+        const List_ = Data as List;
+        const Case = parse(List_, EmptyList);
+        if (Case.length == 2 && Case[0] == EmptyList) {
+            const Res = Case[1];
+            return lists.reverse(Acc.append(Res));
+        }
+        if (Case.length == 2) {
+            const Next_Line = Case[0];
+            const Res = Case[1];
+            return decode_all(Next_Line, Acc.append(Res));
+        }
+        throw new TypeError("Failed to assign left hand side from right hand side: " + util.inspect(Case));
+    } else {
+        throw new Error("bad_arg");
+    }
 }
 
 /********
