@@ -26,6 +26,7 @@ export function char_code(s: string) {
 export const $colon = char_code[":"];
 export const $quote = char_code["'"];
 export const $double_quote = char_code['"'];
+export const $0 = 48;
 export const $a = char_code["a"];
 export const $b = char_code["b"];
 export const $z = char_code["z"];

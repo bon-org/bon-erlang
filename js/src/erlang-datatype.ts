@@ -21,6 +21,10 @@ export class Binary {
     }
 }
 
+export function to_binary(value: Binary | Uint8Array): Binary {
+    return (value instanceof Binary) ? value : new Binary(value);
+}
+
 export class List {
     public readonly value;
     public readonly tail: List;
@@ -55,6 +59,7 @@ export namespace lists {
     }
 
     export function split(Size: int, Res: List) {
+        debug(`split(${util.inspect(Size)},${util.inspect(Res)})`);
         let Acc = EmptyList;
         for (; Size > 0; Size--) {
             Acc = Acc.append(Res.value);
@@ -323,15 +328,21 @@ export function equal(A, B): boolean {
     }
     switch (A_Type) {
         case "array":
-            return A.length == B.length && (A as any[]).every((a, i) => equal(a, B[i]));
+            return equal_array(A, B);
         case "list":
-            return list_equal(A, B);
+            return equal_list(A, B);
+        case "binary":
+            return equal_array(A.value, B.value);
         default:
             return A == B;
     }
 }
 
-export function list_equal(List_A: List, List_B: List): boolean {
+export function equal_array(xs: any[], ys: any[]): boolean {
+    return xs.length == ys.length && xs.every((x, i) => equal(x, ys[i]));
+}
+
+export function equal_list(List_A: List, List_B: List): boolean {
     let A_Head = List_A.value;
     let B_Head = List_B.value;
     let A_Tail = List_A.tail;

@@ -19,10 +19,11 @@ import {
     lists,
     map,
     string_to_binary,
+    to_binary,
     Tuple,
     type_of
 } from "./erlang-datatype";
-import {$a, $colon, $double_quote, $quote, assert, char_code, debug, test_out} from "./utils";
+import {$0, $a, $b, $colon, $double_quote, $quote, assert, char_code, debug, test_out} from "./utils";
 
 /*******
  * API *
@@ -134,6 +135,12 @@ export function serialize(Data): IOList {
             const Children = serialize_list(Data);
             return list(char_code("["), Children, 32, WORD_LIST, 32);
         }
+        case "binary": {
+            const Bin = to_binary(Data);
+            const Size = Bin.value.length;
+            const Bin_Size = integer_to_iolist(Size);
+            return list($quote, $b, $colon, Bin_Size, $colon, Bin, $quote);
+        }
         default:
             throw new TypeError("unknown type: " + type + ", data=" + util.inspect(Data));
     }
@@ -197,6 +204,46 @@ function parse(List: List, Acc: List): [List, any] {
         }
     }
 
+    /* binary */
+    {
+        const match = () => {
+            const H1 = H;
+            if (H1 != $quote) {
+                debug("fail 1");
+                return [false];
+            }
+            const H2 = T0.value;
+            if (H2 != $b) {
+                debug("fail 2");
+                return [false];
+            }
+            const H3 = T0.tail.value;
+            if (H3 != $colon) {
+                debug("fail 3");
+                return [false];
+            }
+            const H4 = T0.tail.tail.value;
+            if (!is_digit(H4)) {
+                debug("fail 4");
+                return [false];
+            }
+            const T0_ = T0.tail.tail.tail;
+            return [true, H4, T0_];
+        };
+        const [is_match, H_, T0_] = match();
+        debug("is_match=" + util.inspect(is_match));
+        if (is_match) {
+            const [Size, List1] = parse_number(T0_, H_ - $0, 2);
+            assert(List1.value == $colon, "Binary data should come with a colon after size");
+            const T1 = List1.tail;
+            const [List_, List2] = lists.split(Size, T1);
+            assert(List2.value == $quote, "Binary data should end with a single quote");
+            const T2 = List2.tail;
+            const Bin = iolist_to_binary(List_);
+            return parse(T2, Acc.append(Bin));
+        }
+    }
+
     /* group: tuple, list and map */
     if (H === char_code["["]) {
         const [Word, T1, Children] = parse(T0, EmptyList) as [any, any, any];
@@ -242,6 +289,7 @@ function parse_head(Token: List, List: List): [boolean, List] {
 }
 
 function parse_number(list: List, acc: number, count: number): [number, List] {
+    debug(`parse_number(${util.inspect(list)},${util.inspect(acc)},${util.inspect(count)})`);
     if (list != EmptyList) {
         if (is_digit(list.value)) {
             return parse_number(list.tail, acc * 10 + (list.value - 48), count);
