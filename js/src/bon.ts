@@ -25,7 +25,7 @@ import {
     tuple_to_list,
     type_of
 } from "./erlang-datatype";
-import {$0, $a, $b, $colon, $double_quote, $quote, assert, char_code, debug, test_out} from "./utils";
+import {$0, $a, $b, $colon, $double_quote, $quote, assert, char_code, test_out} from "./utils";
 
 /*******
  * API *
@@ -36,7 +36,6 @@ export function encode(Data): IOList {
 }
 
 export function decode(IOList_Bin) {
-    debug(`decode(${util.inspect(IOList_Bin)})`);
     const Type = type_of(IOList_Bin);
     switch (Type) {
         case "list":
@@ -131,9 +130,7 @@ const WORD_MAP = "m";
 
 /* serializer  */
 export function serialize(Data): IOList {
-    debug(`serialize(${util.inspect(Data)})`);
     const type = type_of(Data);
-    debug("data type=" + type);
     switch (type) {
         case "int":
             return list(32, integer_to_iolist(Data), 32);
@@ -150,7 +147,6 @@ export function serialize(Data): IOList {
         }
         case "string": {
             const Str = (Data as string).split('"').join('\\"');
-            debug("Str=" + util.inspect(Str));
             return list($double_quote, string_to_binary(Str), $double_quote);
         }
         case "array": {
@@ -189,9 +185,7 @@ export function serialize(Data): IOList {
 }
 
 function serialize_array(Array: any[]): IOList {
-    debug(`serialize_array(${util.inspect(Array)})`);
     return Array.reduce((Acc, X) => {
-        debug("Array.reduce:", util.inspect({X, Acc}));
         return Acc.append(serialize(X));
     }, EmptyList);
 }
@@ -207,7 +201,6 @@ interface Word {
 }
 
 function parse(List: List, Acc: List): [List, any] {
-    debug(`parse(${util.inspect(List)},${util.inspect(Acc)})`);
 
     /* finish */
     if (List == EmptyList) {
@@ -251,29 +244,24 @@ function parse(List: List, Acc: List): [List, any] {
         const match = () => {
             const H1 = H;
             if (H1 != $quote) {
-                debug("fail 1");
                 return [false];
             }
             const H2 = T0.value;
             if (H2 != $b) {
-                debug("fail 2");
                 return [false];
             }
             const H3 = T0.tail.value;
             if (H3 != $colon) {
-                debug("fail 3");
                 return [false];
             }
             const H4 = T0.tail.tail.value;
             if (!is_digit(H4)) {
-                debug("fail 4");
                 return [false];
             }
             const T0_ = T0.tail.tail.tail;
             return [true, H4, T0_];
         };
         const [is_match, H_, T0_] = match();
-        debug("is_match=" + util.inspect(is_match));
         if (is_match) {
             const [Size, List1] = parse_number(T0_, H_ - $0, 2);
             assert(List1.value == $colon, "Binary data should come with a colon after size");
@@ -306,7 +294,6 @@ function parse(List: List, Acc: List): [List, any] {
 
     if (is_alphabet(H)) {
         const [Name, T1] = parse_word(T0, EmptyList.append(H));
-        debug("Name=" + util.inspect(Name));
         const Word: Word = {name: Name};
         return [Word, T1, Acc] as any;
     }
@@ -332,7 +319,6 @@ function parse_head(Token: List, List: List): [boolean, List] {
 }
 
 function parse_number(list: List, acc: number, count: number): [number, List] {
-    debug(`parse_number(${util.inspect(list)},${util.inspect(acc)},${util.inspect(count)})`);
     if (list != EmptyList) {
         if (is_digit(list.value)) {
             return parse_number(list.tail, acc * 10 + (list.value - 48), count);
@@ -358,7 +344,6 @@ function parse_string(list: List, acc: string): [string, List] {
 }
 
 function parse_word(List_: List, Acc) {
-    debug(`parse_word(${util.inspect(List_)},${util.inspect(Acc)})`);
     if (is_word_body(List_.value)) {
         return parse_word(List_.tail, Acc.append(List_.value));
     }
@@ -403,7 +388,6 @@ function gcd(A: int, B: int): int {
 }
 
 function list_to_map(List: List, Acc: map) {
-    debug(`list_to_map(${util.inspect(List)},${util.inspect(Acc)})`);
     if (List === EmptyList) {
         return Acc;
     }

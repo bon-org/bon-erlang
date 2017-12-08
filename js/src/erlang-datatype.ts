@@ -1,5 +1,5 @@
 import * as util from "util";
-import {$a, $z, assert, char_code, debug} from "./utils";
+import {$a, $z, assert, char_code} from "./utils";
 
 export function Atom(Str: string) {
     return Symbol.for(Str);
@@ -59,7 +59,6 @@ export namespace lists {
     }
 
     export function split(Size: int, Res: List) {
-        debug(`split(${util.inspect(Size)},${util.inspect(Res)})`);
         let Acc = EmptyList;
         for (; Size > 0; Size--) {
             Acc = Acc.append(Res.value);
@@ -70,11 +69,9 @@ export namespace lists {
 
     export function foldl<A>(F: (c: any, acc: A) => A, Acc: A, L: List): A {
         for (; ;) {
-            debug("foldl:", util.inspect({Acc, L}));
             if (L === EmptyList) {
                 return Acc;
             }
-            debug(`F(${util.inspect(L.value)},${util.inspect(Acc)})`);
             Acc = F(L.value, Acc);
             L = L.tail;
         }
@@ -261,9 +258,7 @@ export function type_of(Data) {
 /** TODO speed up **/
 export function iolist_to_binary(List0: List): Binary {
     const List1 = iolist_to_binary_walk(List0, []);
-    // debug("List1=" + util.inspect(List1));
     const Bin = Uint8Array.from(List1);
-    // debug("Bin=" + util.inspect(Bin));
     return new Binary(Bin);
 }
 
@@ -291,14 +286,12 @@ export function iolist_to_binary_walk(list: IOList, acc: number[]): number[] {
                 acc.push(v);
                 break;
             }
-            debug(`iolist_to_binary_walk(${util.inspect(list)},${util.inspect(acc)}) on unknown data type: ${type}`);
             acc.push(v);
     }
     return iolist_to_binary_walk(list.tail, acc);
 }
 
 export function binary_to_list(Bin: Binary): List {
-    // debug(`binary_to_list(${util.inspect(Bin)})`);
     const res = Bin.value.reduce((acc, c) => acc.append(c), EmptyList);
     return lists.reverse(res);
 }
