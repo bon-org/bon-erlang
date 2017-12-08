@@ -21,6 +21,7 @@ import {
     string_to_binary,
     to_binary,
     Tuple,
+    tuple_to_list,
     type_of
 } from "./erlang-datatype";
 import {$0, $a, $b, $colon, $double_quote, $quote, assert, char_code, debug, test_out} from "./utils";
@@ -140,6 +141,12 @@ export function serialize(Data): IOList {
             const Size = Bin.value.length;
             const Bin_Size = integer_to_iolist(Size);
             return list($quote, $b, $colon, Bin_Size, $colon, Bin, $quote);
+        }
+        case "tuple": {
+            const Tuple = Data as Tuple;
+            const List_ = tuple_to_list(Tuple);
+            const Children = serialize_list(List_);
+            return list(char_code["["], Children, 32, WORD_TUPLE, 32);
         }
         default:
             throw new TypeError("unknown type: " + type + ", data=" + util.inspect(Data));
@@ -264,6 +271,7 @@ function parse(List: List, Acc: List): [List, any] {
 
     if (is_alphabet(H)) {
         const [Name, T1] = parse_word(T0, EmptyList.append(H));
+        debug("Name=" + util.inspect(Name));
         const Word: Word = {name: Name};
         return [Word, T1, Acc] as any;
     }
@@ -314,12 +322,14 @@ function parse_string(list: List, acc: string): [string, List] {
         : parse_string(list.tail, acc + String.fromCodePoint(list.value));
 }
 
-function parse_word(List: List, Acc) {
-    if (is_word_body(List.value)) {
-        return parse_word(List.tail, Acc.append(List.value));
+function parse_word(List_: List, Acc) {
+    debug(`parse_word(${util.inspect(List_)},${util.inspect(Acc)})`);
+    if (is_word_body(List_.value)) {
+        return parse_word(List_.tail, Acc.append(List_.value));
     }
+    assert(List_ instanceof List, "bad_arg first argument should be List");
     const Name = list_to_string(lists.reverse(Acc));
-    return [Name, List];
+    return [Name, List_];
 }
 
 function fac(F: float) {

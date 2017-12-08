@@ -173,6 +173,10 @@ export function list_to_tuple(list: List): Tuple {
     return new Tuple(...list_to_array(list));
 }
 
+export function tuple_to_list(tuple: Tuple): List {
+    return array_to_list(tuple.value);
+}
+
 export function array_to_tuple(Arr: any[]) {
     return new Tuple(...Arr);
 }
@@ -332,6 +336,8 @@ export function equal(A, B): boolean {
         case "list":
             return equal_list(A, B);
         case "binary":
+            return equal_array(A.value, B.value);
+        case "tuple":
             return equal_array(A.value, B.value);
         default:
             return A == B;
