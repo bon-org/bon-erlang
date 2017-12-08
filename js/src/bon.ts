@@ -2,11 +2,21 @@
 
 import * as util from "util";
 
+const output = console.log.bind(console);
+const test_out = console.log.bind(console, "[test] ");
+const log = console.log.bind(console, "[log] ");
+const debug = console.log.bind(console, "[debug] ");
+
+/*******
+ * API *
+ *******/
+
 export function encode(Data): IOList {
     return serialize(Data);
 }
 
 export function decode(IOList_Bin) {
+    debug(`decode(${util.inspect(IOList_Bin)})`);
     const Type = type_of(IOList_Bin);
     switch (Type) {
         case "list":
@@ -26,7 +36,9 @@ export function decode(IOList_Bin) {
 export function decode_all(Data) {
 }
 
-/* Test */
+/********
+ * Test *
+ ********/
 
 export function data_test(Data?) {
     if (Data) {
@@ -51,13 +63,16 @@ export function data_test(Data?) {
     ].map(data => {
         const res = data_test(data);
         if (res == "ok") {
-            console.log("passed " + util.inspect(data));
+            test_out("passed " + util.inspect(data));
         }
         return res;
     });
 }
 
-/* Internal */
+/************
+ * Internal *
+ ************/
+
 function Atom(Str: string) {
     return Symbol.for(Str);
 }
@@ -138,7 +153,8 @@ namespace format {
     }
 
     export function binary(bin: Binary) {
-        return "<<" + bin.value.join(",") + ">>";
+        bin = bin.value || bin;
+        return "<<" + (bin as Uint8Array).join(",") + ">>";
     }
 
     export function atom(atom: symbol) {
@@ -256,6 +272,9 @@ function type_of(Data) {
     if (Data instanceof Tuple) {
         return "tuple";
     }
+    if (Data instanceof Uint8Array) {
+        return "binary";
+    }
     if (Data instanceof Binary) {
         return "binary";
     }
@@ -275,9 +294,12 @@ function type_of(Data) {
 }
 
 /** TODO speed up **/
-function iolist_to_binary(List: List): Binary {
-    const res = iolist_to_binary_walk(List, []);
-    return new Binary(Uint8Array.from(res));
+function iolist_to_binary(List0: List): Binary {
+    const List1 = iolist_to_binary_walk(List0, []);
+    debug("List1=" + util.inspect(List1));
+    const Bin = Uint8Array.from(List1);
+    debug("Bin=" + util.inspect(Bin));
+    return new Binary(Bin);
 }
 
 function iolist_to_binary_walk(list: IOList, acc: number[]): number[] {
@@ -292,13 +314,21 @@ function iolist_to_binary_walk(list: IOList, acc: number[]): number[] {
         case "list":
             iolist_to_binary_walk(list.value as IOList, acc);
             break;
+        case "string":
+            const n = list.value.length;
+            for (let i = 0; i < n; i++) {
+                acc.push((list.value as string).charCodeAt(i));
+            }
+            break;
         default:
+            debug(`iolist_to_binary_walk(${util.inspect(list)},${util.inspect(acc)}) on unknown data type: ${type}`);
             acc.push(list.value);
     }
     return iolist_to_binary_walk(list.tail, acc);
 }
 
 function binary_to_list(Bin: Binary): List {
+    debug(`binary_to_list(${util.inspect(Bin)})`);
     const res = Bin.value.reduce((acc, c) => acc.append(c), EmptyList);
     return lists.reverse(res);
 }
@@ -307,8 +337,13 @@ function byte_size(Bin: Binary): number {
     return Bin.value.byteLength;
 }
 
+const WORD_TUPLE = "t";
+const WORD_LIST = "l";
+const WORD_MAP = "m";
+
 /* serializer  */
 export function serialize(Data): IOList {
+    debug(`serialize(${util.inspect(Data)})`);
     const type = type_of(Data);
     switch (type) {
         case "int":
@@ -326,12 +361,23 @@ export function serialize(Data): IOList {
         }
         case "string": {
             const Str = (Data as string).split('"').join('\\"');
-            return list($double_quote, Str, $double_quote);
+            debug("Str=" + util.inspect(Str));
+            return list($double_quote, string_to_binary(Str), $double_quote);
+        }
+        case "array": {
+            const Children = serialize_array(Data);
+            return list(char_code["["], Children, 32, WORD_LIST, 32);
         }
         default:
-            throw new TypeError("unknown type: " + type);
+            throw new TypeError("unknown type: " + type + ", data=" + util.inspect(Data));
     }
 }
+
+function serialize_array(Array: any[]): IOList {
+    return Array.reduce((X, Acc) => Acc.append(serialize(X)), EmptyList);
+}
+
+/* utils */
 
 function assert(bool: boolean, msg: string) {
     if (!bool) {
@@ -342,7 +388,7 @@ function assert(bool: boolean, msg: string) {
 /* parser */
 
 function parse(List: List, Acc: List): [List, any] {
-    // console.debug("parse:", List, Acc);
+    debug(`parse(${util.inspect(List)},${util.inspect(Acc)})`);
 
     /* finish */
     if (List == EmptyList) {
@@ -378,6 +424,12 @@ function parse(List: List, Acc: List): [List, any] {
         }
     }
 
+    /* string */
+    if (List.value === $double_quote) {
+        const [Str, T1] = parse_string(List.tail, "");
+        return parse(T1, Acc.append(Str));
+    }
+
     /* not impl */
     // List = list_to_string(List) as any;
     throw new Error("bad_arg: " + util.inspect({List, Acc}));
@@ -403,6 +455,18 @@ function parse_number(list: List, acc: number, count: number): [number, List] {
         }
     }
     return [acc, list];
+}
+
+/**
+ * input without starting double quote
+ * output without ending double quote
+ *
+ * e.g. 'text"rest' ~~> ["text","rest"]
+ * */
+function parse_string(list: List, acc: string): [string, List] {
+    return list.value === $double_quote
+        ? [acc, list.tail]
+        : parse_string(list.tail, acc + String.fromCodePoint(list.value));
 }
 
 type float = number;
