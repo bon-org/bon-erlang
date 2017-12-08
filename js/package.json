@@ -45,5 +45,16 @@
     "tslint-eslint-rules": "^4.1.1",
     "typescript": "^2.6.1",
     "zone.js": "^0.8.4"
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+ "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beenotung/bon.git"
+  },
+  "bugs": {
+    "url": "https://github.com/beenotung/bon/issues"
+  },
+  "homepage": "https://github.com/beenotung/bon#readme"
 }
