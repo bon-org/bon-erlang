@@ -153,12 +153,20 @@ namespace format {
         return atom(s);
     }
 
-    export function object(o: any) {
+    export function map(o: any) {
         return "#{"
             + Object.keys(o)
                 .map(k => util.inspect(k) + " => " + util.inspect(o[k]))
                 .join(",")
             + "}";
+    }
+
+    export function object(o: any) {
+        return "{ "
+            + Object.keys(o)
+                .map(k => util.inspect(k) + ": " + util.inspect(o[k]))
+                .join(", ")
+            + " }";
     }
 }
 {
