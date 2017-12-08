@@ -5,12 +5,14 @@ A.K.A. Beeno Object Notation
 
 Based on stackish.
 
-Designed to enable loss-less data exchange between Erlang to Javascript.
+== Introduction ==
+
+This protocol and library is designed to enable loss-less data exchange between Erlang to Javascript.
 
 Loss-less means it will not mess up tuple and list, nor atom and hashmap key
 
-integer is represented in dec format, e.g. 42
-floating number is represented in rational format (of integer), e.g. 314/100
+Integer is represented in dec format, e.g. 42
+Floating number is represented in rational format (of integer), e.g. 314/100
 
 
 == The Mapping between Erlang term, BON and Javascript term ==
@@ -18,16 +20,16 @@ floating number is represented in rational format (of integer), e.g. 314/100
 .Data Type Mapping Table
 [options="header"]
 |=========================================
-| Erlang    | Stackish        | Javascript
+| Erlang    | BON             | Javascript
 
 | integer   | integer         | number
 | float     | rational number | number
 | atom      | atom blob       | Symbol
-| binary    | binary blob     | Blob
+| binary    | binary blob     | Uint8Array
 | tuple     | tuple group     | Tuple
-| list      | list group      | Array
+| list      | list group      | List / Array
 | char_list | string          | string
-| map       | map group       | object
+| map       | map group       | Map / object
 |=========================================
 
 == Examples ==
