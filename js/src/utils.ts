@@ -29,3 +29,5 @@ export const $double_quote = char_code['"'];
 export const $a = char_code["a"];
 export const $b = char_code["b"];
 export const $z = char_code["z"];
+
+export const swap = (x, y) => [y, x];

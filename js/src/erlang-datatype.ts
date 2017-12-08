@@ -1,5 +1,5 @@
 import * as util from "util";
-import {$a, $z, assert, char_code, debug} from "./utils";
+import {$a, $z, assert, char_code, debug, swap} from "./utils";
 
 export function Atom(Str: string) {
     return Symbol.for(Str);
@@ -62,7 +62,20 @@ export namespace lists {
         }
         return [reverse(Acc), Res];
     }
+
+    export function foldl<A>(F: (c: any, acc: A) => A, Acc: A, L: List): A {
+        for (; ;) {
+            debug("foldl:", util.inspect({Acc, L}));
+            if (L === EmptyList) {
+                return Acc;
+            }
+            debug(`F(${util.inspect(L.value)},${util.inspect(Acc)})`);
+            Acc = F(L.value, Acc);
+            L = L.tail;
+        }
+    }
 }
+
 export namespace format {
     export function list(list: List) {
         if (list == EmptyList) {
@@ -151,6 +164,10 @@ export function list_to_atom(list: List) {
     return Atom(list_to_string(list));
 }
 
+export function list_to_tuple(list: List): Tuple {
+    return new Tuple(...list_to_array(list));
+}
+
 export function array_to_tuple(Arr: any[]) {
     return new Tuple(...Arr);
 }
@@ -179,6 +196,9 @@ export type IOList = List;
 
 export function integer_to_iolist(x: int): IOList {
     assert(type_of(x) == "int", "expect integer: " + util.inspect(x));
+    if (x == 0) {
+        return EmptyList.append(48);
+    }
     let acc = EmptyList;
     let neg = false;
     if (x < 0) {
@@ -227,9 +247,9 @@ export function type_of(Data) {
 /** TODO speed up **/
 export function iolist_to_binary(List0: List): Binary {
     const List1 = iolist_to_binary_walk(List0, []);
-    debug("List1=" + util.inspect(List1));
+    // debug("List1=" + util.inspect(List1));
     const Bin = Uint8Array.from(List1);
-    debug("Bin=" + util.inspect(Bin));
+    // debug("Bin=" + util.inspect(Bin));
     return new Binary(Bin);
 }
 
@@ -252,14 +272,19 @@ export function iolist_to_binary_walk(list: IOList, acc: number[]): number[] {
             }
             break;
         default:
+            const v = list.value;
+            if (0 <= v && v <= 255) {
+                acc.push(v);
+                break;
+            }
             debug(`iolist_to_binary_walk(${util.inspect(list)},${util.inspect(acc)}) on unknown data type: ${type}`);
-            acc.push(list.value);
+            acc.push(v);
     }
     return iolist_to_binary_walk(list.tail, acc);
 }
 
 export function binary_to_list(Bin: Binary): List {
-    debug(`binary_to_list(${util.inspect(Bin)})`);
+    // debug(`binary_to_list(${util.inspect(Bin)})`);
     const res = Bin.value.reduce((acc, c) => acc.append(c), EmptyList);
     return lists.reverse(res);
 }
@@ -271,3 +296,54 @@ export function byte_size(Bin: Binary): number {
 export type float = number;
 export type int = number;
 export type atom = symbol;
+export type map = Map<any, any>;
+
+export function equal(A, B): boolean {
+    const A_Type = type_of(A);
+    const B_Type = type_of(B);
+    if (A_Type != B_Type) {
+        if ((A_Type == "array" && B_Type == "list")
+            || (A_Type == "list" && B_Type == "array")) {
+            if (B_Type == "array") {
+                [B, A] = swap(A, B);
+            }
+            let B_Head = (B as List).value;
+            let B_Tail = (B as List).tail;
+            const All = (A as any[]).every(A_Head => {
+                if (equal(A_Head, B_Head)) {
+                    B_Head = B_Tail.value;
+                    B_Tail = B_Tail.tail;
+                    return true;
+                }
+                return false;
+            });
+            return All && B_Tail == EmptyList; // or b tail equal to undefined?
+        }
+        return false;
+    }
+    switch (A_Type) {
+        case "array":
+            return A.length == B.length && (A as any[]).every((a, i) => equal(a, B[i]));
+        case "list":
+            return list_equal(A, B);
+        default:
+            return A == B;
+    }
+}
+
+export function list_equal(List_A: List, List_B: List): boolean {
+    let A_Head = List_A.value;
+    let B_Head = List_B.value;
+    let A_Tail = List_A.tail;
+    let B_Tail = List_B.tail;
+    for (; ;) {
+        if (equal(A_Head, B_Head)) {
+            A_Head = A_Tail.value;
+            A_Tail = A_Tail.tail;
+            B_Head = B_Tail.value;
+            B_Tail = B_Tail.tail;
+        } else {
+            return false;
+        }
+    }
+}

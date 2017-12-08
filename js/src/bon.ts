@@ -1,10 +1,25 @@
-
 import * as util from "util";
 import {
-    Atom, binary_to_list, byte_size, EmptyList, float, int, integer_to_iolist, IOList, iolist_to_binary, list, List,
+    Atom,
+    binary_to_list,
+    byte_size,
+    EmptyList,
+    equal,
+    float,
+    int,
+    integer_to_iolist,
+    IOList,
+    iolist_to_binary,
+    list,
+    List,
+    list_to_array,
     list_to_atom,
+    list_to_string,
+    list_to_tuple,
     lists,
-    string_to_binary, Tuple,
+    map,
+    string_to_binary,
+    Tuple,
     type_of
 } from "./erlang-datatype";
 import {$a, $colon, $double_quote, $quote, assert, char_code, debug, test_out} from "./utils";
@@ -45,8 +60,16 @@ export function decode_all(Data) {
 export function data_test(Data?) {
     if (Data) {
         const Res = decode(encode(Data));
-        if (Data != Res) {
-            throw new Error("not_match: " + util.inspect({Data, Res}));
+        if (!equal(Data, Res)) {
+            throw new Error("not_match: " + util.inspect({
+                Data: {
+                    type: type_of(Data),
+                    value: Data
+                }, Res: {
+                    type: type_of(Res),
+                    value: Res
+                }
+            }));
         }
         return "ok";
     }
@@ -83,6 +106,7 @@ const WORD_MAP = "m";
 export function serialize(Data): IOList {
     debug(`serialize(${util.inspect(Data)})`);
     const type = type_of(Data);
+    debug("data type=" + type);
     switch (type) {
         case "int":
             return list(32, integer_to_iolist(Data), 32);
@@ -106,16 +130,32 @@ export function serialize(Data): IOList {
             const Children = serialize_array(Data);
             return list(char_code["["], Children, 32, WORD_LIST, 32);
         }
+        case "list": {
+            const Children = serialize_list(Data);
+            return list(char_code("["), Children, 32, WORD_LIST, 32);
+        }
         default:
             throw new TypeError("unknown type: " + type + ", data=" + util.inspect(Data));
     }
 }
 
 function serialize_array(Array: any[]): IOList {
-    return Array.reduce((X, Acc) => Acc.append(serialize(X)), EmptyList);
+    debug(`serialize_array(${util.inspect(Array)})`);
+    return Array.reduce((Acc, X) => {
+        debug("Array.reduce:", util.inspect({X, Acc}));
+        return Acc.append(serialize(X));
+    }, EmptyList);
+}
+
+function serialize_list(List: List): IOList {
+    return lists.foldl((X, Acc) => Acc.append(serialize(X)), EmptyList, List);
 }
 
 /* parser */
+
+interface Word {
+    name: string
+}
 
 function parse(List: List, Acc: List): [List, any] {
     debug(`parse(${util.inspect(List)},${util.inspect(Acc)})`);
@@ -126,37 +166,64 @@ function parse(List: List, Acc: List): [List, any] {
         return [List, Acc.value];
     }
 
+    const H = List.value;
+    const T0 = List.tail;
+
     /* skip space */
-    if (List.value == 32) {
-        return parse(List.tail, Acc);
+    if (H == 32) {
+        return parse(T0, Acc);
     }
 
     /* number */
-    if (is_digit(List.value)) {
-        const [num, tail] = parse_number(List.tail, List.value - 48, 1);
+    if (is_digit(H)) {
+        const [num, tail] = parse_number(T0, H - 48, 1);
         return parse(tail, Acc.append(num));
     }
-    if (List.value == char_code["-"] && List.tail != EmptyList && is_digit(List.tail.value)) {
-        const [num, tail] = parse_number(List.tail.tail, List.tail.value - 48, 1);
+    if (H == char_code["-"] && T0 != EmptyList && is_digit(T0.value)) {
+        const [num, tail] = parse_number(T0.tail, T0.value - 48, 1);
         return parse(tail, Acc.append(-num));
     }
 
     /* atom */
     {
-        const [is_match, T0] = parse_head(list($quote, $a, $colon), List);
-        if (is_match && is_digit(T0.value)) {
-            const [Size, T1] = parse_number(T0.tail, T0.value - 48, 2);
-            assert(T1.value == $colon, "invalid atom expr (1)");
-            const [List, T2] = lists.split(Size, T1.tail);
-            assert(T2.value == $quote, "invalid atom expr (2)");
+        const [is_match, T1] = parse_head(list($quote, $a, $colon), List);
+        if (is_match && is_digit(T1.value)) {
+            const [Size, T2] = parse_number(T1.tail, T1.value - 48, 2);
+            assert(T2.value == $colon, "invalid atom expr (1)");
+            const [List, T3] = lists.split(Size, T2.tail);
+            assert(T3.value == $quote, "invalid atom expr (2)");
             const Atom = list_to_atom(List);
-            return parse(T2.tail, Acc.append(Atom));
+            return parse(T3.tail, Acc.append(Atom));
         }
     }
 
+    /* group: tuple, list and map */
+    if (H === char_code["["]) {
+        const [Word, T1, Children] = parse(T0, EmptyList) as [any, any, any];
+        const Res = (() => {
+            switch (Word.name) {
+                case WORD_TUPLE:
+                    return list_to_tuple(Children);
+                case WORD_LIST:
+                    return list_to_array(Children);
+                case WORD_MAP:
+                    return list_to_map(Children, new Map());
+                default:
+                    throw new TypeError("unexpected word: " + util.inspect(Word));
+            }
+        })();
+        return parse(T1, Acc.append(Res));
+    }
+
+    if (is_alphabet(H)) {
+        const [Name, T1] = parse_word(T0, EmptyList.append(H));
+        const Word: Word = {name: Name};
+        return [Word, T1, Acc] as any;
+    }
+
     /* string */
-    if (List.value === $double_quote) {
-        const [Str, T1] = parse_string(List.tail, "");
+    if (H === $double_quote) {
+        const [Str, T1] = parse_string(T0, "");
         return parse(T1, Acc.append(Str));
     }
 
@@ -199,6 +266,14 @@ function parse_string(list: List, acc: string): [string, List] {
         : parse_string(list.tail, acc + String.fromCodePoint(list.value));
 }
 
+function parse_word(List: List, Acc) {
+    if (is_word_body(List.value)) {
+        return parse_word(List.tail, Acc.append(List.value));
+    }
+    const Name = list_to_string(lists.reverse(Acc));
+    return [Name, List];
+}
+
 function fac(F: float) {
     if (F == 1) {
         return [1, 1];
@@ -234,6 +309,19 @@ function gcd(A: int, B: int): int {
             : gcd(B, A % B);
 }
 
-function is_digit(c) {
-    return 48 <= c && c <= (48 + 9);
+function list_to_map(List: List, Acc: map) {
+    if (List === EmptyList) {
+        return Acc;
+    }
+    const K = List.value;
+    const V = List.tail.value;
+    const T = List.tail.tail;
+    Acc.set(K, V);
+    return list_to_map(T, Acc);
 }
+
+const is_digit = (c) => 48 <= c && c <= (48 + 9);
+const is_small_cap = (c) => char_code["a"] <= c && c <= char_code["z"];
+const is_large_cap = (c) => char_code["A"] <= c && c <= char_code["Z"];
+const is_alphabet = (c) => is_small_cap(c) || is_large_cap(c);
+const is_word_body = (c) => is_digit(c) || is_alphabet(c);
