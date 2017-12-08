@@ -75,7 +75,7 @@ export function data_test(Data?) {
         }
         return "ok";
     }
-    return [42,
+    const res = [42,
         -72,
         1.5,
         3.14,
@@ -93,7 +93,8 @@ export function data_test(Data?) {
             test_out("passed " + util.inspect(data));
         }
         return res;
-    });
+    }).every(res => res == "ok");
+    return res === true ? "ok" : res;
 }
 
 /************
@@ -147,6 +148,16 @@ export function serialize(Data): IOList {
             const List_ = tuple_to_list(Tuple);
             const Children = serialize_list(List_);
             return list(char_code["["], Children, 32, WORD_TUPLE, 32);
+        }
+        case "object": {
+            const Children = Object.keys(Data)
+                .reduce((Acc, K) => {
+                    const V = Data[K];
+                    const K_Bin = serialize(K);
+                    const V_Bin = serialize(V);
+                    return Acc.append(K_Bin).append(V_Bin);
+                }, EmptyList);
+            return list(char_code["["], Children, 32, WORD_MAP, 32);
         }
         default:
             throw new TypeError("unknown type: " + type + ", data=" + util.inspect(Data));
@@ -368,6 +379,7 @@ function gcd(A: int, B: int): int {
 }
 
 function list_to_map(List: List, Acc: map) {
+    debug(`list_to_map(${util.inspect(List)},${util.inspect(Acc)})`);
     if (List === EmptyList) {
         return Acc;
     }

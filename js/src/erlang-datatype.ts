@@ -1,5 +1,5 @@
 import * as util from "util";
-import {$a, $z, assert, char_code, debug, swap} from "./utils";
+import {$a, $z, assert, char_code, debug} from "./utils";
 
 export function Atom(Str: string) {
     return Symbol.for(Str);
@@ -117,12 +117,14 @@ export namespace format {
         return atom(s);
     }
 
-    export function map(o: any) {
-        return "#{"
-            + Object.keys(o)
-                .map(k => util.inspect(k) + " => " + util.inspect(o[k]))
-                .join(",")
-            + "}";
+    export function map(map: map) {
+        const acc = new Array(map.size);
+        let i = 0;
+        map.forEach((v, k) => {
+            acc[i] = util.inspect(k) + " => " + util.inspect(v);
+            i++;
+        });
+        return "#{" + (acc.join(",")) + "}";
     }
 
     export function object(o: any) {
@@ -241,6 +243,9 @@ export function type_of(Data) {
     if (Data instanceof List) {
         return "list";
     }
+    if (Data instanceof Map) {
+        return "map";
+    }
     if (Number.isInteger(Data)) {
         return "int";
     }
@@ -311,22 +316,14 @@ export function equal(A, B): boolean {
     const A_Type = type_of(A);
     const B_Type = type_of(B);
     if (A_Type != B_Type) {
-        if ((A_Type == "array" && B_Type == "list")
-            || (A_Type == "list" && B_Type == "array")) {
-            if (B_Type == "array") {
-                [B, A] = swap(A, B);
-            }
-            let B_Head = (B as List).value;
-            let B_Tail = (B as List).tail;
-            const All = (A as any[]).every(A_Head => {
-                if (equal(A_Head, B_Head)) {
-                    B_Head = B_Tail.value;
-                    B_Tail = B_Tail.tail;
-                    return true;
-                }
-                return false;
-            });
-            return All && B_Tail == EmptyList; // or b tail equal to undefined?
+        if (A_Type == "array" && B_Type == "list") {
+            return equal_array_list(A, B);
+        } else if (B_Type == "array" && A_Type == "list") {
+            return equal_array_list(B, A);
+        } else if (A_Type == "object" && B_Type == "map") {
+            return equal_object_map(A, B);
+        } else if (B_Type == "object" && A_Type == "map") {
+            return equal_object_map(B, A);
         }
         return false;
     }
@@ -342,6 +339,21 @@ export function equal(A, B): boolean {
         default:
             return A == B;
     }
+}
+
+export function equal_array_list(A: any[], B: List): boolean {
+    let B_Head = (B as List).value;
+    let B_Tail = (B as List).tail;
+    /* TODO check if A and B are of same length, make sure handle short B correctly */
+    const All = A.every(A_Head => {
+        if (equal(A_Head, B_Head)) {
+            B_Head = B_Tail.value;
+            B_Tail = B_Tail.tail;
+            return true;
+        }
+        return false;
+    });
+    return All && B_Tail == EmptyList; // or b tail equal to undefined?
 }
 
 export function equal_array(xs: any[], ys: any[]): boolean {
@@ -362,5 +374,26 @@ export function equal_list(List_A: List, List_B: List): boolean {
         } else {
             return false;
         }
+    }
+}
+
+export function equal_object_map(A: any, B: map): boolean {
+    const keys = Object.keys(A);
+    if (keys.length !== B.size) {
+        return false;
+    }
+    try {
+        B.forEach((B_V, B_K) => {
+            if (!(B_K in A)) {
+                throw false;
+            }
+            const A_V = A[B_K];
+            if (!equal(A_V, B_V)) {
+                throw false;
+            }
+        });
+        return true;
+    } catch (e) {
+        return e;
     }
 }
