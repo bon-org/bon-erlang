@@ -6,7 +6,12 @@
   "author": "Beeno Tung",
   "license": "BSD-3-Clause",
   "scripts": {
-    "clean": "rm -f bon.* && rm -f test/bon_test.js",
+    "clean": "run-p clean:*",
+    "clean:test": "rm -f jstest/bon_test.js",
+    "clean:js": "rm -f *.js",
+    "clean:map": "rm -f *.js.map",
+    "clean:d.ts": "rm -f *.d.ts",
+    "clean:.": "rm -f *.js",
     "build": "tsc -p ./",
     "lint": "tslint --type-check --project tsconfig.json -c tslint.json",
     "fix": "tslint --fix -p .",
