@@ -9,7 +9,9 @@ matrix:
         - 17.5
         - R16B03
       install: make deps
-      script: make app && make rel
+      script:
+        - make
+        - make dialyze
     - language: node_js
       before_script: cd js && npm install
       node_js:

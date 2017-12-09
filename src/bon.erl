@@ -74,6 +74,8 @@ data_test() ->
 %% Internal %%
 %%%%%%%%%%%%%%
 
+-spec decode_all(iolist(), [term()])-> [term()].
+
 decode_all(List, Acc) when is_list(List), is_list(Acc) ->
   case parse(List, []) of
     {[], Res} -> lists:reverse([Res | Acc]);
@@ -161,17 +163,17 @@ serialize_test(X) ->
 
 -record(word, {name}).
 
--spec parse(InputStream, OutputStream) -> {RestInputStream, NewOutputStream} when
-  InputStream :: iolist(),
-  OutputStream :: [term()],
-  RestInputStream :: iolist(),
-  NewOutputStream :: [term()].
-
 -define(is_digit(X), (X >= $0 andalso X =< $9)).
 -define(is_small_cap(X), (X >= $a andalso X =< $z)).
 -define(is_large_cap(X), (X >= $A andalso X =< $Z)).
 -define(is_alphabet(X), (?is_small_cap(X) or ?is_large_cap(X))).
 -define(is_word_body(X), (?is_digit(X) or ?is_alphabet(X))).
+
+-spec parse(InputStream, OutputStream) -> {RestInputStream, NewOutputStream} when
+  InputStream :: iolist(),
+  OutputStream :: [term()],
+  RestInputStream :: iolist(),
+  NewOutputStream :: [term()].
 
 %% finish
 parse([], [Acc]) ->
@@ -205,7 +207,7 @@ parse([$', $b, $:, H | T0], Acc) when ?is_digit(H) ->
 
 %% group: tuple, list and map
 parse([$[ | T0], Acc) ->
-  {#word{name = Name}, T1, Children} = parse(T0, []),
+  {T1, [#word{name = Name} | Children]} = parse(T0, []),
   Res = case Name of
           ?WORD_TUPLE -> erlang:list_to_tuple(Children);
           ?WORD_LIST -> Children;
@@ -216,7 +218,7 @@ parse([$[ | T0], Acc) ->
 parse([H | T0], Acc) when ?is_alphabet(H) ->
   {Name, T1} = parse_word(T0, [H]),
   Word = #word{name = Name},
-  {Word, T1, Acc};
+  {T1, [Word | Acc]};
 
 %% string
 parse([$" | T0], Acc) ->
