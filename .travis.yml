@@ -16,7 +16,8 @@ matrix:
         - "0.12"
 branches:
   only:
-    - master
+  - gh-pages
+  - /.*/
 notifications:
   email:
     recipients:
