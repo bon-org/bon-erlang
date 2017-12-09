@@ -9,7 +9,7 @@ matrix:
         - 17.5
         - R16B03
     - language: node_js
-      before_script: cd js
+      before_script: cd js && npm install
       node_js:
         - "9"
         - "8"
