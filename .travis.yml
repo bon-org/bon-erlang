@@ -1,17 +1,9 @@
 matrix:
   include:
     - language: erlang
-      otp_release:
-        - 20
-        - 18.2.1
-        - 18.1
-        - 18.0
-        - 17.5
-        - R16B03
+      otp_release: 20.0
       install: make deps
-      script:
-        - make
-        - make dialyze
+      script: make && make dialyze
     - language: node_js
       before_script: cd js && npm install
       node_js:
