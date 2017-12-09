@@ -1,0 +1,29 @@
+matrix:
+  include:
+    - language: erlang
+      otp_release:
+        - 20
+        - 18.2.1
+        - 18.1
+        - 18.0
+        - 17.5
+        - R16B03
+    - language: node_js
+      before_script: cd js
+      node_js:
+        - "9"
+        - "8"
+        - "7"
+        - "6"
+        - "5"
+        - "4"
+        - "0.12"
+branches:
+  only:
+    - master
+notifications:
+  email:
+    recipients:
+      - aabbcc1241@yahoo.com.hk
+    on_success: change
+    on_failure: always
