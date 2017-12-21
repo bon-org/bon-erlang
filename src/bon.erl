@@ -13,7 +13,7 @@
 -module(bon).
 
 %% API
--export([encode/1, decode/1, decode_all/1]).
+-export([encode/1, encode/2, decode/1, decode_all/1]).
 
 %% Util
 -export([fac/1]).
@@ -21,6 +21,7 @@
 %% Testing
 -include_lib("eunit/include/eunit.hrl").
 -export([data_test/1, fac_test/1, serialize_test/1]).
+-export([flatten_test/1]).
 -export([debug/0, debug2/0]).
 
 -define(list_to_atom(X), erlang:list_to_existing_atom(X)).
@@ -28,6 +29,15 @@
 %%%%%%%%%
 %% API %%
 %%%%%%%%%
+
+encode(Data, Opts) when is_list(Opts) ->
+  IOList = serialize(Data),
+  case Opts of
+    [] ->
+      IOList;
+    [compact] ->
+      shrink(IOList)
+  end.
 
 encode(Data) ->
   serialize(Data).
@@ -53,7 +63,7 @@ data_test(Data) ->
   ?assertEqual(Data, decode(encode(Data))).
 
 data_test() ->
-  lists:foreach(fun data_test/1, [
+  Res = lists:all(fun(X) -> data_test(X) == ok end, [
     42,
     -72,
     3.14,
@@ -65,16 +75,20 @@ data_test() ->
     [{debug, true}, safe, speedup, {log, "file.log"}],
     #{user=>"name", pw=>"123"},
     #{12=>34, "user"=>name},
-    #{log=>[#{time=> 123}, #{time=> 234}]}
+    #{log=>[#{time=> 123}, #{time=> 234}]},
+    sets:from_list([42, 3.14, "str"])
   ]),
-  ok.
+  case Res of
+    true -> ok;
+    X -> X
+  end.
 
 
 %%%%%%%%%%%%%%
 %% Internal %%
 %%%%%%%%%%%%%%
 
--spec decode_all(iolist(), [term()])-> [term()].
+-spec decode_all(iolist(), [term()]) -> [term()].
 
 decode_all(List, Acc) when is_list(List), is_list(Acc) ->
   case parse(List, []) of
@@ -88,6 +102,7 @@ is_string(X) ->
 -define(WORD_TUPLE, "t").
 -define(WORD_LIST, "l").
 -define(WORD_MAP, "m").
+-define(WORD_SET, "s").
 
 %%%%%%%%%%%%%%
 % serializer %
@@ -114,10 +129,16 @@ serialize(Bin) when is_binary(Bin) ->
   [$', $b, $:, Bin_Size, $:, Bin, $'];
 
 serialize(Tuple) when is_tuple(Tuple) ->
-  List = erlang:tuple_to_list(Tuple),
-%%  Children = lists:map(fun serialize/1, List),
-  Children = serialize_list(List),
-  [$[, Children, $ , ?WORD_TUPLE, $ ];
+  case sets:is_set(Tuple) of
+    true ->
+      List = sets:to_list(Tuple),
+      Children = serialize_list(List),
+      [$[, Children, $ , ?WORD_SET, $ ];
+    false ->
+      List = erlang:tuple_to_list(Tuple),
+      Children = serialize_list(List),
+      [$[, Children, $ , ?WORD_TUPLE, $ ]
+  end;
 
 serialize(List) when is_list(List) ->
   case is_string(List) of
@@ -125,7 +146,6 @@ serialize(List) when is_list(List) ->
       Str = lists:map(fun quote_string_char/1, List),
       [$", Str, $"];
     false ->
-%%      Children = lists:map(fun serialize/1, List),
       Children = serialize_list(List),
       [$[, Children, $ , ?WORD_LIST, $ ]
   end;
@@ -289,6 +309,21 @@ list_to_map([], Acc) when is_map(Acc) ->
   Acc;
 list_to_map([K, V | T], Acc) ->
   list_to_map(T, maps:put(K, V, Acc)).
+
+shrink(Xs) when is_list(Xs) ->
+  shrink(Xs, []).
+
+shrink([], Acc) ->
+  Acc;
+shrink([H | T], Acc) when is_list(H) ->
+  shrink(H, shrink(T, Acc));
+shrink([$  | T], [$  | Acc]) ->
+  shrink(T, [$  | Acc]);
+shrink([H | T], Acc) ->
+  [H | shrink(T, Acc)].
+
+flatten_test(X) ->
+  shrink(X).
 
 debug() ->
   dbg:start(),
