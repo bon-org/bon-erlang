@@ -61,7 +61,6 @@ Loss-less means it will not mess up tuple and list, nor atom and hashmap key
 
 
 == TODO ==
-. Add support to set (and dict?)
 . Migrate this repo into org
   i.e. bon/bon-erl, bon/bon-js
 . Implement Golang library
