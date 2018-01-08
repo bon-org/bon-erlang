@@ -39,6 +39,7 @@ Loss-less means it will not mess up tuple and list, nor atom and hashmap key
 | list      | list group      | List / Array
 | char_list | string          | string
 | map       | map group       | Map / object
+| set       | set group       | Set
 |=========================================
 
 == Examples ==
@@ -55,6 +56,7 @@ Loss-less means it will not mess up tuple and list, nor atom and hashmap key
 | list group      | [ 3 2 1 l
 | string          | "foo"
 | map group       | [ "admin" "user" "123" "pw" m
+| set group       | [ 42 3.14 "str" s
 |==============================
 
 
