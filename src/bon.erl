@@ -231,7 +231,8 @@ parse([$[ | T0], Acc) ->
   Res = case Name of
           ?WORD_TUPLE -> erlang:list_to_tuple(Children);
           ?WORD_LIST -> Children;
-          ?WORD_MAP -> list_to_map(Children, #{})
+          ?WORD_MAP -> list_to_map(Children, #{});
+          ?WORD_SET -> sets:from_list(Children)
         end,
   parse(T1, [Res | Acc]);
 
