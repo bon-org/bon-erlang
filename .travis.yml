@@ -4,16 +4,6 @@ matrix:
       otp_release: 20.0
       install: make deps
       script: make && make dialyze
-    - language: node_js
-      before_script: cd js && npm install
-      node_js:
-        - "9"
-        - "8"
-        - "7"
-        - "6"
-        - "5"
-        - "4"
-        - "0.12"
 branches:
   only:
   - gh-pages
