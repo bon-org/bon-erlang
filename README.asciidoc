@@ -61,6 +61,8 @@ Loss-less means it will not mess up tuple and list, nor atom and hashmap key
 
 
 == TODO ==
-. Migrate this repo into org
-  i.e. bon/bon-erl, bon/bon-js
+. Migrate the repo into personal to org
+  - [ ] move js to bon-js
+  - [ ] move erl to bon-erl
+  - [ ] update link to build status and npm package in readme
 . Implement Golang library
